@@ -162,6 +162,19 @@ Before that will work, three things have to exist — a Play account, the app in
 Console, and two sets of secrets. Only you can do those, because Google requires the
 account owner to verify their identity and sign in.
 
+> **The button only appears after a merge.** GitHub shows *Run workflow* for a
+> `workflow_dispatch` file only once that file is on the default branch, so until PR #1
+> is merged into `main` the Actions tab will not offer it — that is not a sign anything
+> is broken. The same job runs from a tag with no such restriction, and a `v*` tag is
+> the route that works today:
+>
+> ```bash
+> git tag v1.0.0 && git push origin v1.0.0
+> ```
+>
+> Both routes run the identical workflow. The tag route uses the defaults —
+> the `internalsharing` track, status `completed` — which is what you want anyway.
+
 ### What I cannot do for you
 
 Google gates all of this behind the account owner: creating the developer account

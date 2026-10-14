@@ -146,8 +146,10 @@ MTN Mobile Money"), because Play shows them small.
 The upload is automated — **Actions → Publish to Google Play → Run workflow**. It builds
 a signed bundle, uploads it to the track you pick, attaches the R8 mapping for readable
 crash reports, and on the default `internalsharing` track prints a URL that installs the
-app on your phone in minutes with no review. The one-time setup (upload key, app entry,
-service account) is in [§5 of the app docs](../ANDROID_APP.md#5-publishing-to-google-play).
+app on your phone in minutes with no review. GitHub only offers that button once the
+workflow is on `main`, so before the merge, tag the commit instead — `git tag v1.0.0 &&
+git push origin v1.0.0` triggers the identical job. The one-time setup (upload key, app
+entry, service account) is in [§5 of the app docs](../ANDROID_APP.md#5-publishing-to-google-play).
 
 Release notes for that upload live in [`release-notes/`](release-notes/) —
 `whatsnew-en-US.txt` is what testers and customers read under "What's new", so edit it

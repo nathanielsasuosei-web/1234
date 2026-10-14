@@ -173,14 +173,14 @@ jobs:
           name: meetbeatz-aab
           path: dist
 
-      - name: Upload to the ${{ inputs.track || 'internal' }} track
+      - name: Upload to the ${{ inputs.track || 'internalsharing' }} track
         id: play
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.meetbeatz.app
           releaseFiles: dist/*.aab
-          track: ${{ inputs.track || 'internal' }}
+          track: ${{ inputs.track || 'internalsharing' }}
           status: ${{ inputs.status || 'completed' }}
           releaseName: "Meetbeatz ${{ needs.bundle.outputs.version }}"
           whatsNewDirectory: docs/play/release-notes
@@ -193,7 +193,7 @@ jobs:
           {
             echo "### Meetbeatz ${{ needs.bundle.outputs.version }} uploaded"
             echo
-            echo "Track: \`${{ inputs.track || 'internal' }}\`  ·  status: \`${{ inputs.status || 'completed' }}\`"
+            echo "Track: \`${{ inputs.track || 'internalsharing' }}\`  ·  status: \`${{ inputs.status || 'completed' }}\`"
             echo
             if [ -n "$DOWNLOAD_URL" ]; then
               echo "**Install it on a phone:** [$DOWNLOAD_URL]($DOWNLOAD_URL)"

@@ -15,7 +15,7 @@ notifications and a branded offline screen.
 | **See it in a browser** | `tools/preview_web_patch.sh`, or open the site on a phone and choose **Install app** |
 | **Read this first** | [`docs/ANDROID_APP.md`](docs/ANDROID_APP.md) — build, sign, verify, publish, troubleshoot |
 | **Website side** | [`web/README-ANDROID.md`](web/README-ANDROID.md) — the manifest, service worker and asset links the site needs |
-| **Publish to Play** | Actions → **Publish to Google Play** → Run workflow (one-time setup: [`docs/ANDROID_APP.md` §5](docs/ANDROID_APP.md#5-publishing-to-google-play)) |
+| **Publish to Play** | Actions → **Publish to Google Play** → Run workflow — the button appears once this branch is merged; before that, `git tag v1.0.0 && git push origin v1.0.0` runs the same job (one-time setup: [`docs/ANDROID_APP.md` §5](docs/ANDROID_APP.md#5-publishing-to-google-play)) |
 | **Play Store listing** | [`docs/play/store-listing.md`](docs/play/store-listing.md) — listing copy, data safety, screenshots, checklist |
 
 ## Quick start
