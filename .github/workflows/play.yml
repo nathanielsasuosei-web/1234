@@ -137,6 +137,7 @@ jobs:
           PY
 
       - name: Collect the bundle
+        if: steps.credentials.outputs.has_key == 'true'
         working-directory: .
         run: |
           mkdir -p dist
