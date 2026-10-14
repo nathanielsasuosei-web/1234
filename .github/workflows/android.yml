@@ -90,6 +90,16 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee -a gradle.log
 
+      # The bundle is the file that actually reaches Play, so it is built here on every
+      # push. Without this step the first time anything compiles an .aab would be the
+      # publish run itself — the worst possible place to discover the packaging task is
+      # broken.
+      - name: Build release bundle (the Play artifact)
+        if: success()
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace bundleRelease 2>&1 | tee -a gradle.log
+
       - name: Report build failures as annotations
         # Kotlin and Java compiler errors, plus the Gradle failure summary, are
         # republished as check-run annotations. They are then readable from the API
@@ -149,6 +159,19 @@ jobs:
             fi
           done
           cp android/signing-report.txt dist/ || true
+          # An .aab is a ZIP whose first entry is BundleConfig.pb; a truncated download or
+          # a failed build would still copy as a zero-byte or unreadable file, and Play
+          # reports that as an opaque upload error. Check it here instead.
+          aab="android/app/build/outputs/bundle/release/app-release.aab"
+          if [ -f "$aab" ]; then
+            cp "$aab" "dist/meetbeatz-${version}-${code}.aab"
+            unzip -l "dist/meetbeatz-${version}-${code}.aab" | grep -q 'BundleConfig.pb' \
+              || { echo "::error::app-release.aab is not a readable bundle"; exit 1; }
+            echo "Packaged bundle: $(du -h "dist/meetbeatz-${version}-${code}.aab" | cut -f1)"
+          else
+            echo "::error::bundleRelease produced no app-release.aab"
+            exit 1
+          fi
           ls -la dist
 
       - name: Upload debug APK
@@ -167,6 +190,16 @@ jobs:
             dist/*release.apk
             dist/signing-report.txt
           if-no-files-found: warn
+          retention-days: 90
+
+      # The same artifact the publish workflow uploads to Play, downloadable from every
+      # push, so a build can be sideloaded through the Play Console by hand if needed.
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v5
+        with:
+          name: meetbeatz-release-bundle
+          path: dist/*.aab
+          if-no-files-found: error
           retention-days: 90
 
   lint:
