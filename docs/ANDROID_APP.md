@@ -41,6 +41,12 @@ the phone: open the link, tap the download, accept the unknown-source warning, i
 > re-pushing the tag is safe. Bump `versionCode` before a tag you intend to *ship* — Play
 > refuses a code it has already seen, and `tools/bump_version_code.sh` does it.
 
+> **Debug installs and Play installs cannot coexist.** The debug APK uses the package name
+> `com.meetbeatz.app` but the debug key. Android refuses to upgrade an app across signing
+> keys, so installing the Play build over a debug install fails with a bare "App not
+> installed". Uninstall the debug copy first, then install from Play. Tests can be lost
+> this way (a logged-in session is not — that lives in Chrome, not the app).
+
 The same tag also runs **Publish to Google Play**, which skips itself with a warning until
 the upload key exists (see §5). One tag, one version, both channels — and nothing turns
 red just because Play has not been set up yet.

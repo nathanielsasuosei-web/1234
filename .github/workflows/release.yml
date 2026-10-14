@@ -121,6 +121,13 @@ jobs:
           this work is still an unapplied patch under \`web/\`. Everything else works — the
           store, studio booking and the recording booth all run inside the app.
 
+          ## Before you install the Play build later
+
+          This APK carries the same package name as the Play build but a different signing
+          key. Android refuses to replace an app with one signed by another key, so when
+          Play's copy arrives, uninstall this one first — otherwise the install fails with
+          a bare "App not installed" that explains nothing.
+
           Tag $TAG · commit $short_commit.
           EOF
           echo "--- release notes ---"
