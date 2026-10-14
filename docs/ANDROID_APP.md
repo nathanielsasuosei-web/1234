@@ -26,7 +26,26 @@ docs/                 this file, and the Play Store material
 
 ## 1. Get an APK on a phone
 
-### The easy way — GitHub Actions
+### The fastest way — a tagged release (this is the one for a phone)
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The **Release an installable build** workflow builds the debug APK, attaches it to a
+GitHub Release and prints the download URL. Because the repository is public, that URL
+needs no login, and it is an `.apk` rather than a zip — so the whole install happens on
+the phone: open the link, tap the download, accept the unknown-source warning, install.
+
+> Re-tagging the same version replaces the APK rather than failing, so fixing a build and
+> re-pushing the tag is safe. Bump `versionCode` before a tag you intend to *ship* — Play
+> refuses a code it has already seen, and `tools/bump_version_code.sh` does it.
+
+The same tag also runs **Publish to Google Play**, which skips itself with a warning until
+the upload key exists (see §5). One tag, one version, both channels — and nothing turns
+red just because Play has not been set up yet.
+
+### The manual way — Actions artifacts
 
 Every push to this repository builds the app and attaches it as a download:
 
@@ -34,7 +53,13 @@ Every push to this repository builds the app and attaches it as a download:
 2. Under **Artifacts**, download **meetbeatz-debug-apk** (about 4.7 MB).
 3. Unzip it, copy `meetbeatz-1.0.0-1-debug.apk` to the phone (or send it by WhatsApp /
    email / Drive), tap it, and allow installation from that source when Android asks.
-4. Open **Meetbeatz**. You should see the splash screen, then the store — no address bar.
+4. Open **Meetbeatz**. You should see the splash screen, then the store.
+
+On the address bar: Android hides it only when `/.well-known/assetlinks.json` on your
+domain lists the certificate the installed build was actually signed with. With the
+placeholder fingerprint, or when the website patch is not deployed yet, the app still
+runs but Chrome keeps its bar on screen. That is the expected state until §3 is done —
+it is not a bug in the app, and a Play-installed build behaves the same way.
 
 The first build takes about five minutes; later builds are faster. The release artifact
 carries `signing-report.txt` — the SHA-256 of every signing certificate in the build, which
@@ -181,8 +206,15 @@ account owner to verify their identity and sign in.
 > git tag v1.0.0 && git push origin v1.0.0
 > ```
 >
-> Both routes run the identical workflow. The tag route uses the defaults —
-> the `internalsharing` track, status `completed` — which is what you want anyway.
+> Both routes run the identical workflow. The tag route uses the defaults — the
+> `internalsharing` track, status `completed` — which is what you want anyway. It also
+> produces the installable build described in §1, so `git tag v1.0.0 && git push origin
+> v1.0.0` is the one command for a version: testers get a link, and Play gets the bundle.
+>
+> Before the upload key exists, the tag does both halves *without* failing: the release is
+> published, and the Play job reports that it skipped itself. Only pressing the **Run
+> workflow** button with no key configured is treated as an error, because then you clearly
+> meant to publish.
 
 ### What I cannot do for you
 
