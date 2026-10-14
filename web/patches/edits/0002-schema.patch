@@ -1,0 +1,32 @@
+diff --git a/src/db/schema.ts b/src/db/schema.ts
+index 74c57b9..2723cc5 100644
+--- a/src/db/schema.ts
++++ b/src/db/schema.ts
+@@ -26,6 +26,14 @@ export const admins = pgTable("admins", {
+   name: text("name").notNull(),
+   passwordHash: text("password_hash").notNull(),
+   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
++  /**
++   * Web Push subscription for the producer's own devices: the endpoint the push
++   * service handed the browser, plus its two keys, as stored JSON. Null until the
++   * producer turns notifications on from a phone — nothing writes it before then,
++   * which is why the column is nullable and the endpoint that fills it returns
++   * `stored: false` for anyone who is not signed in.
++   */
++  pushSubscription: text("push_subscription"),
+ });
+ 
+ // Key/value store for site + payment settings
+@@ -57,6 +65,12 @@ export const customers = pgTable("customers", {
+   passwordHash: text("password_hash").notNull(),
+   phone: text("phone").default("").notNull(),
+   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
++  /**
++   * Web Push subscription for a customer's devices — one per account, replaced on
++   * each device that subscribes, so "your licence is ready" reaches the phone the
++   * customer actually has. Same JSON shape as the admin column above.
++   */
++  pushSubscription: text("push_subscription"),
+ });
+ 
+ /** One private thread per artist: artist ↔ producer messages, plus system notices. */

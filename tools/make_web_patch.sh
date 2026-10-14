@@ -5,11 +5,18 @@
 # The website change lives in this repository in two pieces:
 #
 #   web/public/**, web/src/**          new files, kept here as the editable copy
-#   web/patches/layout-edit.patch       the one edit to an existing file
+#   web/patches/edits/*.patch          the edits to existing files, applied in order
 #
 # and this script folds them into a single patch against the website repository's
 # main branch. Run it after editing anything under web/, then either commit the
 # regenerated patch or hand it to tools/apply_web_patch.sh.
+#
+# The edits are numbered because they must apply in order — 0001-layout.patch adds
+# the manifest link and the service-worker registrar to the root layout, and
+# 0002-schema.patch adds the two push-subscription columns the new route writes to.
+# Both are checked against the site's current main before the patch is written, so a
+# site that has drifted is reported here rather than discovered during someone's
+# deploy.
 #
 # Usage
 # -----
@@ -23,7 +30,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE_REPO="${SITE_REPO:-nathanielsasuosei-web/meetbeatz}"
 OUT="$ROOT/web/patches/0001-make-site-installable-and-app-ready.patch"
-LAYOUT_PATCH="$ROOT/web/patches/layout-edit.patch"
+EDITS_DIR="$ROOT/web/patches/edits"
 SITE_DIR=""
 BRANCH="arena/pwa-android-app"
 
@@ -36,7 +43,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -f "$LAYOUT_PATCH" ]] || { echo "missing $LAYOUT_PATCH" >&2; exit 1; }
+[[ -d "$EDITS_DIR" ]] || { echo "missing $EDITS_DIR" >&2; exit 1; }
 
 workdir=""
 cleanup() { [[ -n "$workdir" && -d "$workdir" ]] && rm -rf "$workdir"; }
@@ -66,15 +73,18 @@ cp "$ROOT/web/public/.well-known/assetlinks.json" public/.well-known/assetlinks.
 cp "$ROOT/web/src/components/service-worker-registrar.tsx" src/components/service-worker-registrar.tsx
 cp "$ROOT/web/src/app/api/push/subscribe/route.ts" src/app/api/push/subscribe/route.ts
 
-if git apply --check "$LAYOUT_PATCH" 2>/dev/null; then
-  git apply "$LAYOUT_PATCH"
-  echo "Applied the layout.tsx edit."
-elif git apply --check --reverse "$LAYOUT_PATCH" 2>/dev/null; then
-  echo "layout.tsx already carries the edit."
-else
-  echo "layout.tsx has drifted from the patch — resolve web/patches/layout-edit.patch by hand." >&2
-  exit 1
-fi
+for edit in "$EDITS_DIR"/*.patch; do
+  name="$(basename "$edit")"
+  if git apply --check "$edit" 2>/dev/null; then
+    git apply "$edit"
+    echo "Applied $name."
+  elif git apply --check --reverse "$edit" 2>/dev/null; then
+    echo "$name already applied."
+  else
+    echo "$name no longer applies — the website has drifted from it. Resolve it by hand." >&2
+    exit 1
+  fi
+done
 
 git add -A
 if git diff --cached --quiet; then

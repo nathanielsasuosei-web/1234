@@ -19,8 +19,9 @@ offline behaviour and the last bit of plumbing rather than new pages.
 - src/components/service-worker-registrar.tsx — registers the worker after load,
   production only, never inside /admin.
 - src/app/api/push/subscribe/route.ts — records a Web Push subscription against
-  the signed-in admin or customer row; inert until the pushSubscription columns
-  exist.
+  the signed-in admin or customer row, and src/db/schema.ts gains the nullable
+  push_subscription columns it writes to (the schema sync in `npm run build` adds
+  them on deploy, so there is no migration step). Delivery is the one piece left.
 - public/.well-known/assetlinks.json — Android App Links verification. The
   fingerprint in it is a placeholder and must be replaced before deploying.
 

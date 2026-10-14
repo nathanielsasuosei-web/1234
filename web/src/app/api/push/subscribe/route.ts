@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { admins, customers } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
-import { getCurrentCustomer } from "@/lib/customer-auth";
+import { getAdminSession } from "@/lib/auth";
+import { getCustomerSession } from "@/lib/customer-auth";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -15,19 +15,19 @@ export const dynamic = "force-dynamic";
  * this endpoint is a place to keep the subscription — the service worker has the
  * push handler (public/sw.js) but nothing records where to send.
  *
- * Deliberately small and additive — no new dependency, no delivery code:
+ * Deliberately small and additive: no new dependency, and no delivery code.
  *
- *   - `pushSubscription` is stored on `admins` for the producer's own devices and
- *     on `customers` for buyers. Those rows only exist if the site owner has added
- *     the columns (see web/README-ANDROID.md), and a missing column is reported as
- *     a skipped save rather than an error the browser would surface to a customer.
+ *   - The subscription is stored on `admins` for the producer's own devices and on
+ *     `customers` for buyers. Both columns (`push_subscription`) ship in the same
+ *     patch as this file and are nullable, so the schema push the build already runs
+ *     adds them on the next deploy and nothing else has to change.
  *   - Sending is left to whatever the producer already uses: `notifyProducer()` in
  *     src/lib/notifications.ts is the single place every booking, order and message
  *     already flows through, so it is the natural place to read these rows and POST
- *     to the subscription's endpoint with VAPID keys.
+ *     to each subscription's endpoint with VAPID keys.
  *
- * Until then this endpoint is harmless: with no caller it stores nothing, and the
- * site works exactly as before.
+ * Until a sender exists this endpoint is harmless: with no caller it stores nothing,
+ * and the site works exactly as before.
  */
 
 type SubscriptionBody = {
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   // Producer first: a signed-in admin device is what a booking alert should reach.
   try {
-    const admin = await getCurrentAdmin();
+    const admin = await getAdminSession();
     if (admin) {
       await db.update(admins).set({ pushSubscription: stored }).where(eq(admins.id, admin.id));
       return Response.json({ ok: true, audience: "admin" });
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const customer = await getCurrentCustomer();
+    const customer = await getCustomerSession();
     if (customer) {
       await db
         .update(customers)

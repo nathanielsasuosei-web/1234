@@ -25,6 +25,10 @@ cd android && ./gradlew assembleDebug        # → app/build/outputs/apk/debug/a
 # Static checks — no Android SDK required, plain Python 3
 python3 tools/ci_check.py
 
+# Prove the website patch is safe to deploy: applies it to a clean clone of the site
+# and runs that project's own typecheck and production build (~1 minute)
+tools/verify_web_patch.sh
+
 # Rebuild the brand artwork from tools/source/logo.png (needs Pillow)
 python3 tools/make_brand_assets.py
 

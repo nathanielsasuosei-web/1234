@@ -15,6 +15,8 @@ folder as a patch because this session could not write to the website repository
 | `public/manifest.webmanifest` + `public/icons/*` | `meetbeatz.com/manifest.webmanifest`, `/icons/*` | Installability, and the name, theme colour, icon and shortcuts the app shows. |
 | `public/sw.js` + `public/offline.html` | `meetbeatz.com/sw.js`, `/offline.html` | A branded offline page instead of the browser's grey error page, plus the push handlers. |
 | `public/.well-known/assetlinks.json` | `meetbeatz.com/.well-known/assetlinks.json` | Proof that the app is owned by the same people as the domain. Without it the app runs, but with the browser's address bar on top. |
+| `src/app/layout.tsx` (edit) | the root layout | Links the manifest, sets the ink theme colour, mounts the service-worker registrar. |
+| `src/db/schema.ts` (edit) | `admins.push_subscription`, `customers.push_subscription` | Where `/api/push/subscribe` records a device. Nullable text columns, so the schema sync that runs as part of `npm run build` adds them on the next deploy. |
 
 ## Applying it
 
@@ -36,6 +38,25 @@ pushes the branch and leaves the pull request to you.
 The patch itself is at `web/patches/0001-make-site-installable-and-app-ready.patch`, and
 `tools/make_web_patch.sh` re-verifies it applies cleanly to the site's current `main`
 before writing it.
+
+### Verify it before it is deployed
+
+```bash
+tools/verify_web_patch.sh          # clone → apply → npm install → tsc → npm run build
+tools/verify_web_patch.sh --typecheck-only
+```
+
+This exists because of a real miss: the first version of this patch imported two helpers
+the site does not export and wrote a column the schema did not have. Both are type errors,
+both would have failed `npm run build` on the deploy, and the Android build could not
+notice — the app only talks to the deployed site over HTTP. The script runs the site's own
+gates against the patched tree, and `python3 tools/ci_check.py` carries a cheap offline
+version of the same check on every push.
+
+**Current status, as of the last run:** the patch applies to the site's `main`
+(`90a7c07`), `tsc --noEmit` is clean, `npm run build` succeeds, and the four files Android
+fetches (`/manifest.webmanifest`, `/sw.js`, `/offline.html`,
+`/.well-known/assetlinks.json`) all answer 200 with the right content types.
 
 ## Step 1 — the certificate fingerprint (do this first)
 
@@ -73,26 +94,13 @@ that matters for a store build. Listing both is normal and supported.
 
 ## Step 2 — push notifications
 
-The service worker already carries the `push` and `notificationclick` handlers, and
+The service worker already carries the `push` and `notificationclick` handlers,
 `src/app/api/push/subscribe/route.ts` stores a subscription against the signed-in admin
-or customer. Two pieces remain, both small.
+or customer, and the two nullable `push_subscription` columns it writes to are part of
+this patch — the schema sync inside `npm run build` adds them on the first deploy, so
+there is no migration step.
 
-**a. Two columns** in `src/db/schema.ts`. `npm run build` pushes the schema on deploy, so
-there is no separate migration step:
-
-```ts
-export const admins = pgTable("admins", {
-  // …
-  pushSubscription: text("push_subscription"),
-});
-
-export const customers = pgTable("customers", {
-  // …
-  pushSubscription: text("push_subscription"),
-});
-```
-
-**b. A sender.** Every booking, order and message already funnels through
+That leaves one piece: **a sender.** Every booking, order and message already funnels through
 `notifyProducer()` in `src/lib/notifications.ts`, which makes it the one place worth
 adding this:
 
@@ -145,13 +153,15 @@ await fetch("/api/push/subscribe", {
 });
 ```
 
-Until `a` and `b` exist, `/api/push/subscribe` answers `{"ok": true, "stored": false}`
-and nothing changes for anyone.
+Until that sender exists, nobody calls `/api/push/subscribe`, the columns stay null and
+nothing changes for anyone.
 
 ## If `/.well-known/assetlinks.json` 404s
 
-Next serves everything in `public/` as-is, including dot-directories, and this is the
-normal way a TWA verification file ships. If a deploy ever refuses to serve the folder —
+Next serves everything in `public/` as-is, including dot-directories — **verified**: the
+patched site was built and run here and all four files Android fetches answered 200 with
+the right content types (`/manifest.webmanifest`, `/sw.js`, `/offline.html`,
+`/.well-known/assetlinks.json`). If a future deploy ever refuses to serve the folder —
 a CDN rule, a rewrites entry, or a host that hides dotfiles — the app can still verify by
 serving it from a route handler instead:
 

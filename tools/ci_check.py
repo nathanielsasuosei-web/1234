@@ -39,6 +39,7 @@ GRADLE = ANDROID / "app" / "build.gradle.kts"
 EXPECTED_ORIGIN = "https://meetbeatz.com"
 EXPECTED_HOST = "meetbeatz.com"
 EXPECTED_PACKAGE = "com.meetbeatz.app"
+EXPECTED_SITE_REPO = "nathanielsasuosei-web/meetbeatz"
 
 DENSITIES = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]
 
@@ -298,6 +299,72 @@ def check_asset_links() -> None:
             )
 
 
+def check_web_patch() -> None:
+    """The website patch must stay in sync with web/, and must type check.
+
+    Type checking the whole site needs its dependencies, so the thorough version of this
+    check lives in tools/verify_web_patch.sh. What is checked here is the specific way the
+    first version of this patch was wrong: it imported two helper functions the site does
+    not export and wrote a column the schema did not have. Both would fail `npm run build`
+    on the deploy, and nothing in the Android build could notice — the app only talks to
+    the deployed site over HTTP.
+
+    Cheap, offline, and it catches the regression that matters:
+      * the route uses the session helpers this site actually exports;
+      * the schema edit ships the two push_subscription columns the route writes to;
+      * the generated patch contains the same code as the editable copy under web/,
+        so a fix applied to one and not the other is caught before it is pushed.
+    """
+    route = ROOT / "web" / "src" / "app" / "api" / "push" / "subscribe" / "route.ts"
+    combined = ROOT / "web" / "patches" / "0001-make-site-installable-and-app-ready.patch"
+
+    if not route.exists():
+        fail("missing web/src/app/api/push/subscribe/route.ts")
+        return
+
+    source = route.read_text(encoding="utf-8")
+
+    for wrong in ("getCurrentAdmin", "getCurrentCustomer"):
+        if wrong in source:
+            fail(
+                f"web push route imports {wrong}, which {EXPECTED_SITE_REPO} does not export "
+                f"(it exports getAdminSession / getCustomerSession) — `npm run build` "
+                f"would fail on the deploy"
+            )
+
+    for required in ("getAdminSession", "getCustomerSession"):
+        if required not in source:
+            fail(f"web push route no longer uses {required}")
+
+    schema_edits = sorted((ROOT / "web" / "patches" / "edits").glob("*.patch"))
+    if not schema_edits:
+        fail("web/patches/edits/ is empty — the site edits have gone missing")
+    else:
+        edit_text = "\n".join(path.read_text(encoding="utf-8") for path in schema_edits)
+        columns = edit_text.count('pushSubscription: text("push_subscription")')
+        if columns != 2:
+            fail(
+                f"the site edits add {columns} pushSubscription column(s), expected 2 "
+                f"(one on admins, one on customers) — the route writes both"
+            )
+
+    if not combined.exists():
+        fail("the generated website patch is missing — run tools/make_web_patch.sh")
+        return
+
+    patch_text = combined.read_text(encoding="utf-8")
+    for wrong in ("getCurrentAdmin", "getCurrentCustomer"):
+        if wrong in patch_text:
+            fail(f"the generated website patch still contains {wrong} — regenerate it")
+    if patch_text.count('pushSubscription: text("push_subscription")') != 2:
+        fail("the generated website patch does not carry both push_subscription columns")
+    for path in ("src/app/layout.tsx", "src/db/schema.ts", "public/sw.js"):
+        if f"a/{path}" not in patch_text and f"+++ b/{path}" not in patch_text:
+            fail(f"the generated website patch does not touch {path}")
+
+    ok(f"website patch in sync ({len(schema_edits)} edit patches, route + schema agree)")
+
+
 def check_gradle() -> None:
     gradle = read(GRADLE)
     if not gradle:
@@ -413,6 +480,7 @@ def main() -> int:
     check_assets()
     check_shortcuts()
     check_asset_links()
+    check_web_patch()
     check_gradle()
     check_kotlin_balance()
 

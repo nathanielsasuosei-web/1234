@@ -206,7 +206,7 @@ then tells you whether they still agree — it cross-checks all four on every ru
 | A paid file does not download | On Android 9 and below the app asks for storage permission when a download starts; refuse it and the file goes to the app's own folder instead, with a toast saying so. Also check the download link is a `GET` that the site authorises by session cookie. |
 | Microphone is silent in `/record` | Android's microphone permission was denied. Long-press the app icon → App info → Permissions → Microphone. |
 | The colour adjuster's export does nothing | That file is generated in the page (a `blob:` URL), which only a full browser can save. The app says so rather than failing silently, and offers to open the site in the browser — this is the one feature a WebView cannot complete. |
-| Notifications never arrive | They are delegated to Chrome, so Chrome must be installed and the app's notification permission granted (Android 13+). Until the site's push subscription is wired up (`web/README-ANDROID.md`, step 2) nothing sends at all. |
+| Notifications never arrive | They are delegated to Chrome, so Chrome must be installed and the app's notification permission granted (Android 13+). Sending also needs the last piece on the website — see `web/README-ANDROID.md`, step 2. |
 | A blank white page in the fallback shell | It means no browser on the device can host a TWA *and* the site failed to load. The offline screen appears with a **Try again** button; if it persists, check `chrome://inspect` on a USB-connected device (debug builds enable WebView debugging). |
 
 ---
@@ -256,9 +256,10 @@ each mean a real native rewrite, and they are the honest answers for v2 — see 
 
 In rough order of value for a beat store:
 
-1. **Push notifications** (~1 hour, mostly website side) — a booking alert on the
-   producer's phone, "your licence is ready" on a customer's. The app already carries the
-   handlers and the route; `web/README-ANDROID.md` step 2 is the wiring.
+1. **Push notifications** (~1 hour) — a booking alert on the producer's phone, "your
+   licence is ready" on a customer's. The handlers, the subscription route and the
+   database columns are already in the site patch; what remains is a sender in
+   `notifyProducer()`. `web/README-ANDROID.md` step 2 has the reference implementation.
 2. **Play Store listing** (§5) — the difference between a shared APK and something
    customers can find and update.
 3. **A native mini-player** — replacing the site's player bar with a real Android media

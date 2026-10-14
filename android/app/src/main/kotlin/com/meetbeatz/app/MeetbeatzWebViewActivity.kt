@@ -525,10 +525,29 @@ class MeetbeatzWebViewActivity : Activity() {
                 setPadding(0, 16, 0, 0)
             },
         )
+        val density = resources.displayMetrics.density
+
         column.addView(
             Button(this).apply {
                 text = getString(R.string.offline_retry)
+                // The style carries text attributes only. setTextAppearance silently
+                // ignores background, padding and margins, so the acid pill — the one
+                // piece of Meetbeatz branding on this screen — is applied here.
                 setTextAppearance(R.style.MeetbeatzButton)
+                background = ContextCompat.getDrawable(
+                    this@MeetbeatzWebViewActivity,
+                    R.drawable.bg_button_acid,
+                )
+                val horizontal = (32 * density).toInt()
+                val vertical = (16 * density).toInt()
+                setPadding(horizontal, vertical, horizontal, vertical)
+                minWidth = 0
+                minimumWidth = 0
+                stateListAnimator = null
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = (28 * density).toInt() }
                 setOnClickListener { retry() }
             },
         )
@@ -537,8 +556,14 @@ class MeetbeatzWebViewActivity : Activity() {
                 text = getString(R.string.open_in_browser)
                 setTextAppearance(R.style.MeetbeatzBody)
                 setTextColor(ContextCompat.getColor(this@MeetbeatzWebViewActivity, R.color.cream))
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                setPadding(0, 24, 0, 0)
+                background = null
+                stateListAnimator = null
+                isAllCaps = false
+                setPadding(0, (16 * density).toInt(), 0, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = (12 * density).toInt() }
                 setOnClickListener {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(webView.url ?: DEFAULT_URL)))
                 }

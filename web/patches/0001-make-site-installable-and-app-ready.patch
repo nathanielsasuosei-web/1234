@@ -1,6 +1,6 @@
-From 05816a56d80877751cd18d7bc23b287df563d71f Mon Sep 17 00:00:00 2001
+From 107bf771f9edfb942d32cf262db5bd8eba340eca Mon Sep 17 00:00:00 2001
 From: Meetbeatz <mrmeetbeeatz@gmail.com>
-Date: Tue, 13 Oct 2026 23:57:21 +0000
+Date: Wed, 14 Oct 2026 01:04:34 +0000
 Subject: [PATCH] Make meetbeatz.com installable and app-ready
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -25,8 +25,9 @@ offline behaviour and the last bit of plumbing rather than new pages.
 - src/components/service-worker-registrar.tsx — registers the worker after load,
   production only, never inside /admin.
 - src/app/api/push/subscribe/route.ts — records a Web Push subscription against
-  the signed-in admin or customer row; inert until the pushSubscription columns
-  exist.
+  the signed-in admin or customer row, and src/db/schema.ts gains the nullable
+  push_subscription columns it writes to (the schema sync in `npm run build` adds
+  them on deploy, so there is no migration step). Delivery is the one piece left.
 - public/.well-known/assetlinks.json — Android App Links verification. The
   fingerprint in it is a placeholder and must be replaced before deploying.
 
@@ -44,7 +45,8 @@ worker unable to register, the site renders exactly as it does today.
  src/app/api/push/subscribe/route.ts         |  90 +++++++++
  src/app/layout.tsx                          |  35 +++-
  src/components/service-worker-registrar.tsx |  46 +++++
- 11 files changed, 519 insertions(+), 1 deletion(-)
+ src/db/schema.ts                            |  14 ++
+ 12 files changed, 533 insertions(+), 1 deletion(-)
  create mode 100644 public/.well-known/assetlinks.json
  create mode 100644 public/icons/apple-touch-icon.png
  create mode 100644 public/icons/icon-192.png
@@ -2338,14 +2340,14 @@ index 0000000..1827519
 +});
 diff --git a/src/app/api/push/subscribe/route.ts b/src/app/api/push/subscribe/route.ts
 new file mode 100644
-index 0000000..57e8526
+index 0000000..a14ca06
 --- /dev/null
 +++ b/src/app/api/push/subscribe/route.ts
 @@ -0,0 +1,90 @@
 +import { db } from "@/db";
 +import { admins, customers } from "@/db/schema";
-+import { getCurrentAdmin } from "@/lib/auth";
-+import { getCurrentCustomer } from "@/lib/customer-auth";
++import { getAdminSession } from "@/lib/auth";
++import { getCustomerSession } from "@/lib/customer-auth";
 +import { eq } from "drizzle-orm";
 +
 +export const dynamic = "force-dynamic";
@@ -2359,19 +2361,19 @@ index 0000000..57e8526
 + * this endpoint is a place to keep the subscription — the service worker has the
 + * push handler (public/sw.js) but nothing records where to send.
 + *
-+ * Deliberately small and additive — no new dependency, no delivery code:
++ * Deliberately small and additive: no new dependency, and no delivery code.
 + *
-+ *   - `pushSubscription` is stored on `admins` for the producer's own devices and
-+ *     on `customers` for buyers. Those rows only exist if the site owner has added
-+ *     the columns (see web/README-ANDROID.md), and a missing column is reported as
-+ *     a skipped save rather than an error the browser would surface to a customer.
++ *   - The subscription is stored on `admins` for the producer's own devices and on
++ *     `customers` for buyers. Both columns (`push_subscription`) ship in the same
++ *     patch as this file and are nullable, so the schema push the build already runs
++ *     adds them on the next deploy and nothing else has to change.
 + *   - Sending is left to whatever the producer already uses: `notifyProducer()` in
 + *     src/lib/notifications.ts is the single place every booking, order and message
 + *     already flows through, so it is the natural place to read these rows and POST
-+ *     to the subscription's endpoint with VAPID keys.
++ *     to each subscription's endpoint with VAPID keys.
 + *
-+ * Until then this endpoint is harmless: with no caller it stores nothing, and the
-+ * site works exactly as before.
++ * Until a sender exists this endpoint is harmless: with no caller it stores nothing,
++ * and the site works exactly as before.
 + */
 +
 +type SubscriptionBody = {
@@ -2406,7 +2408,7 @@ index 0000000..57e8526
 +
 +  // Producer first: a signed-in admin device is what a booking alert should reach.
 +  try {
-+    const admin = await getCurrentAdmin();
++    const admin = await getAdminSession();
 +    if (admin) {
 +      await db.update(admins).set({ pushSubscription: stored }).where(eq(admins.id, admin.id));
 +      return Response.json({ ok: true, audience: "admin" });
@@ -2416,7 +2418,7 @@ index 0000000..57e8526
 +  }
 +
 +  try {
-+    const customer = await getCurrentCustomer();
++    const customer = await getCustomerSession();
 +    if (customer) {
 +      await db
 +        .update(customers)
@@ -2549,6 +2551,38 @@ index 0000000..b12a276
 +
 +  return null;
 +}
+diff --git a/src/db/schema.ts b/src/db/schema.ts
+index 74c57b9..2723cc5 100644
+--- a/src/db/schema.ts
++++ b/src/db/schema.ts
+@@ -26,6 +26,14 @@ export const admins = pgTable("admins", {
+   name: text("name").notNull(),
+   passwordHash: text("password_hash").notNull(),
+   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
++  /**
++   * Web Push subscription for the producer's own devices: the endpoint the push
++   * service handed the browser, plus its two keys, as stored JSON. Null until the
++   * producer turns notifications on from a phone — nothing writes it before then,
++   * which is why the column is nullable and the endpoint that fills it returns
++   * `stored: false` for anyone who is not signed in.
++   */
++  pushSubscription: text("push_subscription"),
+ });
+ 
+ // Key/value store for site + payment settings
+@@ -57,6 +65,12 @@ export const customers = pgTable("customers", {
+   passwordHash: text("password_hash").notNull(),
+   phone: text("phone").default("").notNull(),
+   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
++  /**
++   * Web Push subscription for a customer's devices — one per account, replaced on
++   * each device that subscribes, so "your licence is ready" reaches the phone the
++   * customer actually has. Same JSON shape as the admin column above.
++   */
++  pushSubscription: text("push_subscription"),
+ });
+ 
+ /** One private thread per artist: artist ↔ producer messages, plus system notices. */
 -- 
 2.39.5
 
