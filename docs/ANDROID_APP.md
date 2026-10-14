@@ -205,20 +205,21 @@ Before that will work, three things have to exist — a Play account, the app in
 Console, and two sets of secrets. Only you can do those, because Google requires the
 account owner to verify their identity and sign in.
 
-> **The button only appears after a merge.** GitHub shows *Run workflow* for a
-> `workflow_dispatch` file only once that file is on the default branch, so until PR #1
-> is merged into `main` the Actions tab will not offer it — that is not a sign anything
-> is broken. The same job runs from a tag with no such restriction, and a `v*` tag is
-> the route that works today:
+> **The button lives on the default branch.** GitHub only offers *Run workflow* for a
+> `workflow_dispatch` file once that file is on `main`, which it now is — the button is
+> available. (If it ever goes missing after a change to this file, that is the reason: the
+> Actions tab reads the version on `main`, not the one on your branch.)
+>
+> The tag route has no such restriction and is still the shortcut worth using, because one
+> command does both jobs:
 >
 > ```bash
 > git tag v1.0.0 && git push origin v1.0.0
 > ```
 >
-> Both routes run the identical workflow. The tag route uses the defaults — the
-> `internalsharing` track, status `completed` — which is what you want anyway. It also
-> produces the installable build described in §1, so `git tag v1.0.0 && git push origin
-> v1.0.0` is the one command for a version: testers get a link, and Play gets the bundle.
+> The tag route uses the defaults — the `internalsharing` track, status `completed` — which
+> is what you want anyway. It also produces the installable build described in §1, so this
+> is the one command for a version: testers get a link, and Play gets the bundle.
 >
 > Before the upload key exists, the tag does both halves *without* failing: the release is
 > published, and the Play job reports that it skipped itself. Only pressing the **Run
