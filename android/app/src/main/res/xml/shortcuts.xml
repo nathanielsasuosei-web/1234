@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Long-press shortcuts on the launcher icon.
+
+  Every intent targets android-browser-helper's ShortcutTrampolineActivity rather than
+  the launcher activity itself: Android attaches FLAG_ACTIVITY_NEW_TASK and
+  FLAG_ACTIVITY_CLEAR_TASK to a static shortcut's intent, and the trampoline validates
+  the URL against the app's configured origins before routing the launch. Sending that
+  intent straight at the launcher activity would tear down a running session.
+
+  The URLs are validated against the DEFAULT_URL metadata in AndroidManifest.xml, so a
+  shortcut can only ever open a meetbeatz.com page.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_store"
+        android:shortcutId="store"
+        android:shortcutLongLabel="@string/shortcut_store_long"
+        android:shortcutShortLabel="@string/shortcut_store">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meetbeatz.com/beats"
+            android:targetClass="com.google.androidbrowserhelper.trusted.ShortcutTrampolineActivity"
+            android:targetPackage="com.meetbeatz.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_kits"
+        android:shortcutId="kits"
+        android:shortcutLongLabel="@string/shortcut_kits_long"
+        android:shortcutShortLabel="@string/shortcut_kits">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meetbeatz.com/sound-kits"
+            android:targetClass="com.google.androidbrowserhelper.trusted.ShortcutTrampolineActivity"
+            android:targetPackage="com.meetbeatz.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_record"
+        android:shortcutId="record"
+        android:shortcutLongLabel="@string/shortcut_record_long"
+        android:shortcutShortLabel="@string/shortcut_record">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meetbeatz.com/record"
+            android:targetClass="com.google.androidbrowserhelper.trusted.ShortcutTrampolineActivity"
+            android:targetPackage="com.meetbeatz.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_studio"
+        android:shortcutId="studio"
+        android:shortcutLongLabel="@string/shortcut_studio_long"
+        android:shortcutShortLabel="@string/shortcut_studio">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meetbeatz.com/studio"
+            android:targetClass="com.google.androidbrowserhelper.trusted.ShortcutTrampolineActivity"
+            android:targetPackage="com.meetbeatz.app" />
+    </shortcut>
+
+</shortcuts>

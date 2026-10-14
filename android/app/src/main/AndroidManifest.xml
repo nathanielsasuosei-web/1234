@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Meetbeatz is a Trusted Web Activity: the site itself renders in the user's
+      browser engine with no browser UI, and this app supplies the identity around
+      it — launcher icon, splash screen, shortcuts, notifications and deep links.
+
+      The permissions below are only ever exercised by the WebView fallback (used
+      when no browser on the device can host a Trusted Web Activity). Recording,
+      mixing and voice sessions (meetbeatz.com/record, /live-recording, /call) use
+      getUserMedia, which is why the microphone and camera are requested; both are
+      optional hardware so the app still installs on a device without them.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Android 13+ gates notifications behind a runtime permission. Chrome delivers
+         the site's notifications through this app when delegation is granted. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Only needed on Android 9 and below, where writing a purchased file to the
+         shared Downloads folder is what requires it. Android 10 moved downloads to
+         scoped storage, so the permission is capped rather than dropped: asking for
+         it on a modern phone would be a permission prompt for nothing. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Meetbeatz.Launcher">
+
+        <!-- Android's fallback for links this app is not verified for. -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
+
+        <!-- "Manage app data" in Android settings opens the site's storage settings. -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity">
+            <meta-data
+                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+                android:value="@string/site_url" />
+        </activity>
+
+        <activity
+            android:name=".MeetbeatzLauncherActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+
+            <meta-data
+                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:value="@string/site_url" />
+
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:resource="@color/ink" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+                android:resource="@color/ink" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:resource="@color/ink" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK"
+                android:resource="@color/ink" />
+
+            <!-- The MB monogram on the ink background, drawn by android-browser-helper
+                 while Chrome starts and faded out into the page. -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                android:resource="@drawable/splash" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                android:resource="@color/ink" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+                android:value="300" />
+
+            <meta-data
+                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                android:value="@string/provider_authority" />
+
+            <!-- Chrome is the preferred provider; when no provider can host a TWA,
+                 MeetbeatzLauncherActivity swaps the stock Custom Tab fallback for the
+                 native WebView shell (see MeetbeatzWebViewActivity). -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
+                android:value="webview" />
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep links. Auto-verification asks Android to check
+                 https://meetbeatz.com/.well-known/assetlinks.json; once it lists this
+                 app's signing certificate, meetbeatz.com links open straight in the app.
+                 Only hosts that serve assetlinks.json belong here. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="meetbeatz.com" />
+            </intent-filter>
+        </activity>
+
+        <!-- Required by android-browser-helper to move focus back to the browser after
+             the splash screen, and to hand file uploads back to the web page. -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+
+        <!-- Android 13+ gates notifications behind a runtime permission. When Chrome
+             wants to deliver the site's notifications as Meetbeatz, it asks this app
+             whether that permission is granted and launches this transparent activity
+             to request it. Without the declaration the delegation can never be granted
+             and notifications silently stay Chrome's. -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
+
+        <!-- The fallback shell. Not exported: it is only ever started by this app. -->
+        <activity
+            android:name=".MeetbeatzWebViewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density"
+            android:theme="@style/Theme.Meetbeatz.Fallback"
+            android:windowSoftInputMode="adjustResize" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="@string/provider_authority"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <!-- Delegated notifications: Chrome shows the site's notifications as this
+                 app, so they survive the browser tab being closed. The base service does
+                 its own access control, so no extra permission is required. -->
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>

@@ -1,0 +1,66 @@
+{
+  "name": "Meetbeatz — Beats & Studio Sessions",
+  "short_name": "Meetbeatz",
+  "description": "Buy premium beats with Mobile Money and get your files plus license instantly by email. Book recording, mixing and mastering sessions at the Meetbeatz studio in Accra.",
+  "id": "/",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["music", "shopping", "entertainment"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Beat store",
+      "short_name": "Store",
+      "description": "Preview and license beats",
+      "url": "/beats",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sound kits",
+      "short_name": "Kits",
+      "description": "Free drum kits and loops",
+      "url": "/sound-kits",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Record online",
+      "short_name": "Record",
+      "description": "Record a verse over any beat",
+      "url": "/record",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Book studio time",
+      "short_name": "Studio",
+      "description": "Recording, mixing and mastering",
+      "url": "/studio",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

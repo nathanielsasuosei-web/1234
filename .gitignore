@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------- Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/*.iml
+
+# Signing material must never be committed.
+android/keystore.properties
+android/*.jks
+android/*.keystore
+*.hprof
+
+# ----------------------------------------------------------------------- generated
+# Where tools/make_brand_assets.py writes its intermediate master crop.
+tools/build/
+
+# CI output, and the folder the Android tooling drops APKs into.
+dist/
+
+# ------------------------------------------------------------------------- web patch
+# apply_web_patch.sh works in these when it is pointed at a local checkout.
+web/.tmp/
+
+# --------------------------------------------------------------------------- editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

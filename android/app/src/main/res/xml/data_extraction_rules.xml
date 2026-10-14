@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup and device-transfer rules. Same reasoning as backup_rules.xml:
+  nothing of the customer's is stored in the app itself, and the fallback shell's cache
+  is deliberately left out of both a cloud backup and a phone-to-phone transfer.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="cache" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="cache" path="." />
+    </device-transfer>
+</data-extraction-rules>
