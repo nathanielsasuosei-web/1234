@@ -30,3 +30,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Local preview checkout and its embedded database (tools/preview_web_patch.sh)
+.preview/

@@ -58,6 +58,27 @@ version of the same check on every push.
 fetches (`/manifest.webmanifest`, `/sw.js`, `/offline.html`,
 `/.well-known/assetlinks.json`) all answer 200 with the right content types.
 
+### Look at it before you deploy it
+
+```bash
+tools/preview_web_patch.sh        # → http://localhost:3000
+```
+
+Clones the site, applies the patch, installs its dependencies, starts an embedded
+Postgres (PGlite — no database to install or sign up for), creates the schema from the
+site's own drizzle definition, builds, and serves the result. You get a working storefront
+with seeded demo data, the producer's dashboard at `/admin/login`, and payments in
+simulation mode — plus everything the patch adds: the manifest, the icons, the ink theme
+colour, the offline page and the installable web app.
+
+Because the Android app is a Trusted Web Activity around this exact site, **what you see
+there is what the app renders**. Opening the preview on an Android phone in Chrome and
+choosing **Install app** gives the standalone experience — the new icon, the splash
+screen, no browser UI — which is the closest thing to an app preview without installing an
+APK. The native additions that a browser cannot show (a launcher icon in the drawer,
+long-press shortcuts, files landing in the Downloads folder, delegated notifications) only
+appear once the APK from Actions is installed.
+
 ## Step 1 — the certificate fingerprint (do this first)
 
 `assetlinks.json` is committed with a **placeholder** fingerprint. Until it is replaced,

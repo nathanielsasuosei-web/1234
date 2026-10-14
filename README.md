@@ -12,6 +12,7 @@ notifications and a branded offline screen.
 | | |
 | --- | --- |
 | **Get an APK** | Actions → Android → the latest run → Artifacts → `meetbeatz-debug-apk` |
+| **See it in a browser** | `tools/preview_web_patch.sh`, or open the site on a phone and choose **Install app** |
 | **Read this first** | [`docs/ANDROID_APP.md`](docs/ANDROID_APP.md) — build, sign, verify, publish, troubleshoot |
 | **Website side** | [`web/README-ANDROID.md`](web/README-ANDROID.md) — the manifest, service worker and asset links the site needs |
 | **Play Store** | [`docs/play/store-listing.md`](docs/play/store-listing.md) — listing copy, data safety, screenshots, checklist |
@@ -28,6 +29,10 @@ python3 tools/ci_check.py
 # Prove the website patch is safe to deploy: applies it to a clean clone of the site
 # and runs that project's own typecheck and production build (~1 minute)
 tools/verify_web_patch.sh
+
+# Look at it: same patch, plus an embedded Postgres and a real demo storefront
+# → http://localhost:3000 (producer sign-in at /admin/login)
+tools/preview_web_patch.sh
 
 # Rebuild the brand artwork from tools/source/logo.png (needs Pillow)
 python3 tools/make_brand_assets.py
