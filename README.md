@@ -15,7 +15,8 @@ notifications and a branded offline screen.
 | **See it in a browser** | `tools/preview_web_patch.sh`, or open the site on a phone and choose **Install app** |
 | **Read this first** | [`docs/ANDROID_APP.md`](docs/ANDROID_APP.md) — build, sign, verify, publish, troubleshoot |
 | **Website side** | [`web/README-ANDROID.md`](web/README-ANDROID.md) — the manifest, service worker and asset links the site needs |
-| **Play Store** | [`docs/play/store-listing.md`](docs/play/store-listing.md) — listing copy, data safety, screenshots, checklist |
+| **Publish to Play** | Actions → **Publish to Google Play** → Run workflow (one-time setup: [`docs/ANDROID_APP.md` §5](docs/ANDROID_APP.md#5-publishing-to-google-play)) |
+| **Play Store listing** | [`docs/play/store-listing.md`](docs/play/store-listing.md) — listing copy, data safety, screenshots, checklist |
 
 ## Quick start
 
@@ -39,6 +40,10 @@ python3 tools/make_brand_assets.py
 
 # Fingerprint → assetlinks.json, so links open without a browser bar
 python3 tools/make_assetlinks.py --print-only
+
+# Play upload key + secrets, then a version bump before each release
+tools/make_upload_key.sh
+tools/bump_version_code.sh --name 1.1.0
 
 # Apply the website change and open the pull request on meetbeatz.com's repository
 tools/apply_web_patch.sh --fingerprint AA:BB:CC:…

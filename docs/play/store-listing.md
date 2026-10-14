@@ -141,12 +141,25 @@ MTN Mobile Money"), because Play shows them small.
 
 ---
 
+## Uploading
+
+The upload is automated — **Actions → Publish to Google Play → Run workflow**. It builds
+a signed bundle, uploads it to the track you pick, attaches the R8 mapping for readable
+crash reports, and on the default `internalsharing` track prints a URL that installs the
+app on your phone in minutes with no review. The one-time setup (upload key, app entry,
+service account) is in [§5 of the app docs](../ANDROID_APP.md#5-publishing-to-google-play).
+
+Release notes for that upload live in [`release-notes/`](release-notes/) —
+`whatsnew-en-US.txt` is what testers and customers read under "What's new", so edit it
+before each release.
+
 ## Release checklist
 
 - [ ] `assetlinks.json` deployed with the **Play App Signing** fingerprint (§3 of
       `docs/ANDROID_APP.md`) — Play rejects a TWA whose domain is not verified.
-- [ ] `versionCode` bumped in `android/app/build.gradle.kts`.
-- [ ] `bundleRelease` AAB signed with the upload key.
+- [ ] `versionCode` bumped (`tools/bump_version_code.sh --name x.y.z`).
+- [ ] Signed AAB uploaded — run **Publish to Google Play** with track `internalsharing`
+      first to install it from Play on your own phone, then `production`.
 - [ ] Store listing text, icon and feature graphic uploaded from this folder.
 - [ ] Data safety, content rating and app-access forms completed.
 - [ ] Internal testing release installed on your own phone and checked end to end: browse

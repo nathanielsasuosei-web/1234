@@ -157,26 +157,114 @@ App signing key certificate*, **not** the upload key's. Listing both is normal.
 
 ## 5. Publishing to Google Play
 
-Everything needed is in [`docs/play/`](play/): the 512 × 512 icon, the 1024 × 500 feature
-graphic, and [`store-listing.md`](play/store-listing.md) with the title, short
-description, full description, category and the data-safety answers.
+The upload itself is automated: **Actions → Publish to Google Play → Run workflow**.
+Before that will work, three things have to exist — a Play account, the app in Play
+Console, and two sets of secrets. Only you can do those, because Google requires the
+account owner to verify their identity and sign in.
 
-The parts that only you can do:
+### What I cannot do for you
 
-1. **Developer account** — $25, once. Individual accounts created recently must run a
-   closed test with at least 12 testers for 14 days before production access.
-2. **Privacy policy URL** — `https://meetbeatz.com/privacy` already exists.
-3. **Data safety form** — the app itself collects nothing; the website collects the
-   account and order details. `store-listing.md` has the answers to copy.
-4. **Screenshots** — at least 2 phone screenshots (1080 × 1920 or taller works well).
-   Take them from the app itself so the splash screen and the store both show.
-5. **Content rating questionnaire** — music/store app, no user-generated content shown
-   publicly, and text the answers honestly; it takes five minutes.
-6. **App access** — if any part of the storefront requires a login, give the reviewers a
-   test account so the review does not bounce.
+Google gates all of this behind the account owner: creating the developer account
+($25, identity verification), creating the app entry, and completing the store listing,
+content-rating and data-safety forms. There is no API for account creation, and nobody
+should be asking you for your Play password. Everything *after* that point is scripted.
 
-Then: Internal testing → Closed testing → Production. Internal testing is the fastest way
-to get a real Play-installed build into your own hands, and it takes about an hour.
+### One-time setup
+
+**1. The upload key** — on your own machine:
+
+```bash
+tools/make_upload_key.sh          # writes ~/meetbeatz-upload.jks and prints the secrets
+```
+
+Copy the four `ANDROID_KEYSTORE_*` values it prints into
+**Settings → Secrets and variables → Actions**. Back the `.jks` file up somewhere that
+is not this repository — lose it and you cannot update installed apps.
+
+**2. The app in Play Console** — Play has no API for creating an app, so do it by hand:
+
+1. Play Console → **Create app**. Name `Meetbeatz`, package name
+   **`com.meetbeatz.app`**, app (not game), free.
+2. **App integrity** → accept Play App Signing (the default). This is what re-signs
+   every release.
+3. Copy the **App signing key certificate → SHA-256** and put it in
+   `web/public/.well-known/assetlinks.json` — this one, not the upload key's:
+
+   ```bash
+   python3 tools/make_assetlinks.py --fingerprint <play-signing-sha256> --append
+   ```
+
+**3. The service account** — how CI authenticates to Play without a password:
+
+1. Google Cloud Console → the same project as your Play account → **IAM & Admin →
+   Service accounts → Create**. No roles are needed here.
+2. Open it → **Keys → Add key → JSON**. Download it.
+3. Play Console → **Users and permissions → Invite new users** → paste the service
+   account's email (`…@….iam.gserviceaccount.com`) → **App permissions**: grant it the
+   app, with *Release to testing tracks* and (when you are ready) *Release to
+   production*. Save.
+4. Add the whole JSON file as the **`PLAY_SERVICE_ACCOUNT_JSON`** secret in GitHub.
+
+That is the last of the sign-ins. Everything below is a button.
+
+### Publishing
+
+**Actions → Publish to Google Play → Run workflow**, then choose a track:
+
+| Track | What it means |
+| --- | --- |
+| **`internalsharing`** *(default)* | No review, no listing, no testers. The run prints a **URL that installs the app on any signed-in device** within minutes. This is the fastest way to hold the real Play-signed build. |
+| `internal` | Up to 100 testers you add by email. Needs the listing to exist. |
+| `alpha` / `beta` | Closed and open testing. |
+| `production` | Public. Submitted for review; new personal accounts must first run a closed test with 12+ testers for 14 days. |
+
+Set **status** to `draft` to upload without submitting for review, and **dry_run** to
+build and sign the bundle without uploading at all (useful for checking the build, or
+for uploading the artifact by hand).
+
+The run produces:
+
+- `meetbeatz-aab` — the signed bundle, plus `mapping.txt` so Play can de-obfuscate
+  crash reports (the release build is minified).
+- A run summary with the track, the version and — on internal sharing — the install link.
+
+It also verifies the bundle is signed before uploading, because Play's rejection for an
+unsigned bundle arrives after the fact and reads like a Play problem rather than a
+secret problem.
+
+### Before each release
+
+```bash
+tools/bump_version_code.sh --name 1.1.0     # Play refuses a versionCode it has seen
+```
+
+Play rejects a bundle whose `versionCode` was already used, and the error surfaces after
+the upload. Run this, commit, then run the workflow. After a release is live:
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0    # tags also trigger the publish workflow
+```
+
+### The parts Play still needs from you, by hand
+
+These are Console forms, not uploads — the workflow cannot fill them in:
+
+1. **Privacy policy URL** — `https://meetbeatz.com/privacy` already exists.
+2. **Data safety** — the app itself collects nothing; the website collects account and
+   order details. The answers to copy are in [`play/store-listing.md`](play/store-listing.md).
+3. **Content rating questionnaire** — music/store app, no public user-generated content.
+   Five minutes, and it is required before any track other than internal sharing.
+4. **Screenshots** — at least 2 phone screenshots; take them from the app itself so the
+   splash screen and the store both show. The list is in the store-listing doc.
+5. **App access** — if any part of the storefront needs a login, give review a test
+   account so the release is not bounced.
+6. **Store listing text, icon and feature graphic** — all written and generated; copy
+   them from [`play/store-listing.md`](play/store-listing.md) and
+   [`play/`](play/).
+
+Only the release *notes* are automated: `docs/play/release-notes/whatsnew-en-US.txt` is
+uploaded with every release. Edit that file and the change is what testers and customers
+read under "What's new".
 
 ### Renaming the package (only before the first release)
 
