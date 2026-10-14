@@ -42,6 +42,15 @@ is the value that belongs in `assetlinks.json` (see §3). The debug keystore is 
 between runs, so the debug APK's fingerprint stays the same and can be used for testing
 verified deep links.
 
+Four artifacts come out of every push:
+
+| Artifact | What it is |
+| --- | --- |
+| `meetbeatz-debug-apk` | ~4.7 MB, installable on any phone, the one to start with |
+| `meetbeatz-release-apk` | the minified release build (~644 KB) plus `signing-report.txt` |
+| `meetbeatz-release-bundle` | **the `.aab` that goes to Play** (~1.0 MB) — built and ZIP-verified on every push, so the publish run is never the first time it is compiled |
+| `lint-report` | Android Lint findings, HTML |
+
 ### On your own machine — Android Studio
 
 ```bash
