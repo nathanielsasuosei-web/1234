@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sound kits: the equaliser bars that sit under the monogram in the logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/acid"
+        android:pathData="M4.5,9.5h2.2v5h-2.2z" />
+    <path
+        android:fillColor="@color/acid"
+        android:pathData="M8.6,6.5h2.2v11h-2.2z" />
+    <path
+        android:fillColor="@color/acid"
+        android:pathData="M12.7,4h2.2v16h-2.2z" />
+    <path
+        android:fillColor="@color/acid"
+        android:pathData="M16.8,8h2.2v8h-2.2z" />
+</vector>

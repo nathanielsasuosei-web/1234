@@ -1,0 +1,29 @@
+Make meetbeatz.com installable and app-ready
+
+Groundwork for the Meetbeatz Android app, which is a Trusted Web Activity: the
+site already is the app, so what it needs from this repository is identity,
+offline behaviour and the last bit of plumbing rather than new pages.
+
+- public/manifest.webmanifest — name, ink theme colour, standalone display, the
+  icon set, and shortcuts for the store, sound kits, the recording booth and
+  studio bookings. The Android app reads the same manifest.
+- public/icons/* — 192/512 icons, a maskable 512 and an Apple touch icon, cut
+  from the same logo master as the launcher icon.
+- public/sw.js — network-first navigations, cache-first for hashed build output,
+  and nothing cached for /api, /admin, /checkout, /orders, /license, /account or
+  /cart. Also carries the push and notificationclick handlers.
+- public/offline.html — a self-contained branded offline page.
+- src/app/layout.tsx — links the manifest, adds the viewport export (theme
+  colour, no viewport-fit: the header is not inset-aware yet), and mounts the
+  registrar.
+- src/components/service-worker-registrar.tsx — registers the worker after load,
+  production only, never inside /admin.
+- src/app/api/push/subscribe/route.ts — records a Web Push subscription against
+  the signed-in admin or customer row, and src/db/schema.ts gains the nullable
+  push_subscription columns it writes to (the schema sync in `npm run build` adds
+  them on deploy, so there is no migration step). Delivery is the one piece left.
+- public/.well-known/assetlinks.json — Android App Links verification. The
+  fingerprint in it is a placeholder and must be replaced before deploying.
+
+No existing page changes behaviour: without service worker support, or with the
+worker unable to register, the site renders exactly as it does today.

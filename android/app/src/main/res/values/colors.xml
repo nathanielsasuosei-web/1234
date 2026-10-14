@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The website's own palette (see src/app/globals.css on meetbeatz.com), kept in
+         sync so the splash screen, the system bars and the fallback shell match the
+         page they hand over to. -->
+    <color name="ink">#050506</color>
+    <color name="ink_2">#0D080A</color>
+    <color name="panel">#21080E</color>
+    <color name="line">#54202B</color>
+    <color name="acid">#C6F135</color>
+    <color name="deep_red">#C81E22</color>
+    <color name="cream">#F4F1EA</color>
+    <color name="muted">#8B8B95</color>
+
+    <!-- Adaptive launcher icon: the MB monogram sits on the ink background so the
+         themed-icon and legacy renderings agree. -->
+    <color name="ic_launcher_background">#050506</color>
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meetbeatz</string>
+
+    <!-- The canonical origin. Everything the app launches is checked against this. -->
+    <string name="site_url" translatable="false">https://meetbeatz.com</string>
+
+    <!-- Must match the FileProvider authorities attribute in AndroidManifest.xml and the
+         FILE_PROVIDER_AUTHORITY metadata consumed by android-browser-helper. -->
+    <string name="provider_authority" translatable="false">com.meetbeatz.app.fileprovider</string>
+
+    <!-- Android's fallback asset link verification, used when the user has not yet
+         confirmed the auto-verified App Link prompt. -->
+    <string name="asset_statements" translatable="false">[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://meetbeatz.com"}}]</string>
+
+    <!-- App shortcuts (long-press on the launcher icon). -->
+    <string name="shortcut_store">Beat store</string>
+    <string name="shortcut_store_long">Preview and license beats</string>
+    <string name="shortcut_kits">Sound kits</string>
+    <string name="shortcut_kits_long">Free drum kits and loops</string>
+    <string name="shortcut_record">Record online</string>
+    <string name="shortcut_record_long">Record a verse over any beat</string>
+    <string name="shortcut_studio">Book studio time</string>
+    <string name="shortcut_studio_long">Recording, mixing and mastering</string>
+
+    <!-- Fallback shell. -->
+    <string name="offline_title">You are offline</string>
+    <string name="offline_body">Meetbeatz needs a connection to load the store. Your cart and account are safe.</string>
+    <string name="offline_retry">Try again</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="download_started">Downloading to your Downloads folder…</string>
+    <string name="download_private_folder">Downloading into this app\'s files — allow storage access next time to save straight to Downloads.</string>
+    <string name="download_failed">That download could not be started.</string>
+    <string name="blob_download_unsupported">This file is generated inside the page, which only a full browser can save. Open meetbeatz.com in your browser to export it.</string>
+    <string name="no_app_for_link">No app on this device can open that link.</string>
+    <string name="microphone_denied">Microphone access is off. Enable it in Android settings to record.</string>
+    <string name="camera_denied">Camera access is off. Enable it in Android settings to use the camera.</string>
+    <string name="loading">Loading Meetbeatz…</string>
+</resources>

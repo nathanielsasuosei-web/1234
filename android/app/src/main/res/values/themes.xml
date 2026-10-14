@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Two themes, both deliberately plain.
+
+      Theme.Meetbeatz.Launcher — transparent, because android-browser-helper draws the
+      splash screen itself (the MB monogram on the ink background declared in the
+      manifest) and then hands the window over to Chrome. Giving the launcher activity
+      its own background would flash twice.
+
+      Theme.Meetbeatz.Fallback — used by the WebView shell when no browser on the device
+      can host a Trusted Web Activity. It paints the ink background edge to edge so the
+      status and navigation bars read as part of the page.
+    -->
+    <style name="Theme.Meetbeatz.Launcher" parent="@android:style/Theme.Translucent.NoTitleBar" />
+
+    <style name="Theme.Meetbeatz.Fallback" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/ink</item>
+        <item name="android:colorBackground">@color/ink</item>
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="android:navigationBarColor">@color/ink</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!--
+      Text styles for the offline/error screen.
+
+      Deliberately NOT named "Meetbeatz.Fallback.Something": a style name containing dots
+      implies a parent style named by the part before the last dot, so
+      "Meetbeatz.Fallback.Title" would look for a "Meetbeatz.Fallback" style and fail the
+      resource link. Either declare a parent (or an empty one) or, as here, keep the name
+      flat.
+    -->
+    <style name="MeetbeatzTitle">
+        <item name="android:textColor">@color/cream</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="MeetbeatzBody">
+        <item name="android:textColor">@color/muted</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:lineSpacingMultiplier">1.25</item>
+    </style>
+
+    <!--
+      Text-only on purpose. These are applied with `setTextAppearance`, which honours
+      text attributes (colour, size, style, spacing) and silently ignores everything
+      else — background, padding and layout margins have to be set on the view itself.
+      Keeping the style purely typographic is what stops it from looking like it should
+      be doing more than it does.
+    -->
+    <style name="MeetbeatzButton">
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+</resources>

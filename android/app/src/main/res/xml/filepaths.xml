@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paths the app's FileProvider is allowed to share.
+
+  android-browser-helper uses the FileProvider to hand a downloaded image or audio file
+  back to a web page (a share target, or a file input the user picked from Files). Only
+  the app's own internal and external app-private directories are exposed — never the
+  shared Downloads folder, where a customer's paid files live.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      android-browser-helper writes the splash bitmap to
+      files/twa_splash/splash_image.png and hands Chrome a FileProvider URI for it, so
+      this exact entry is what makes the splash screen available to the browser as well
+      as to the app. The general entries below it cover every other file the app shares
+      (a photo or audio clip handed back to a web page).
+    -->
+    <files-path name="twa_splash" path="twa_splash/" />
+
+    <files-path name="internal_files" path="." />
+    <cache-path name="internal_cache" path="." />
+    <external-files-path name="external_files" path="." />
+</paths>

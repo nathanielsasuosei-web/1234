@@ -1,0 +1,65 @@
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index bf2a122..5b55a9c 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -1,5 +1,6 @@
+-import type { Metadata } from "next";
++import type { Metadata, Viewport } from "next";
+ import type { ReactNode } from "react";
++import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
+ import "./globals.css";
+ 
+ // The icon routes are the files next to this layout, all cut from the same
+@@ -23,6 +24,12 @@ export const metadata: Metadata = {
+     default: "Meetbeatz — Beats & Studio Sessions",
+     template: "%s · Meetbeatz",
+   },
++  // Served from public/manifest.webmanifest, with the icons drawn from the same
++  // master artwork as the Android launcher icon. This is what makes the site
++  // installable, and it is the manifest the Trusted Web Activity reads for its
++  // name, theme colour and shortcuts.
++  manifest: "/manifest.webmanifest",
++  applicationName: "Meetbeatz",
+   description:
+     "Buy premium beats with Mobile Money and get your files plus license instantly by email. Book recording, mixing and mastering sessions at the Meetbeatz studio.",
+   icons: {
+@@ -35,6 +42,28 @@ export const metadata: Metadata = {
+   },
+ };
+ 
++/**
++ * Tells the browser how to paint the area around the page.
++ *
++ * `themeColor` is what keeps the Android app looking like the site: inside a Trusted
++ * Web Activity and in the installed web app, the area the page does not paint — the
++ * status bar and the strip behind the navigation bar — takes the site's ink black
++ * instead of the browser's own chrome. It matches `background_color` in
++ * public/manifest.webmanifest, and the app's own splash screen uses the same value.
++ *
++ * `viewport-fit=cover` is deliberately NOT set here. It would draw the page edge to
++ * edge, which the layout is only half ready for: globals.css already pads the player
++ * bar with `env(safe-area-inset-bottom)`, but nothing keeps the header clear of a
++ * status bar or a camera cutout. Until the header carries a matching
++ * `env(safe-area-inset-top)` inset, letting the browser place the content below the
++ * status bar is the version that does not clip the logo.
++ */
++export const viewport: Viewport = {
++  width: "device-width",
++  initialScale: 1,
++  themeColor: "#050506",
++};
++
+ export default function RootLayout({ children }: { children: ReactNode }) {
+   return (
+     <html lang="en">
+@@ -46,6 +75,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
+           <span />
+         </div>
+         {children}
++        {/* Registers the offline shell and the push handlers (public/sw.js).
++            Renders nothing and does nothing until the site is on the home screen
++            or inside the Android app. */}
++        <ServiceWorkerRegistrar />
+       </body>
+     </html>
+   );

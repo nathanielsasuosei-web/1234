@@ -1,0 +1,233 @@
+name: Android
+
+# Builds the Meetbeatz app and publishes installable APKs as artifacts, so the app
+# can be tested on a phone without installing a JDK, the Android SDK or Android
+# Studio on anybody's laptop. Every run also runs the static checks in
+# tools/ci_check.py, which catch the mistakes a compile would (unresolved resource
+# ids, a manifest pointing at the wrong origin, a missing icon density).
+#
+# Downloading a build: Actions → Android → the run → Artifacts → meetbeatz-debug-apk.
+#
+# Signing: if the repository has the ANDROID_KEYSTORE_BASE64 secret, the release
+# APK is signed with it and both APKs are uploaded. Without it, the release APK is
+# built unsigned — still a useful check that the release build compiles — and only
+# the debug APK is published. See docs/ANDROID_APP.md for how to create the secrets.
+
+on:
+  push:
+    branches: ["main", "arena/**"]
+    # Documentation-only changes deliberately do not start a build — nothing in
+    # docs/ or README.md can affect the APK. Use the Run workflow button
+    # (workflow_dispatch, below) to build one on demand.
+    paths:
+      - "android/**"
+      - "tools/**"
+      - "web/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/android-build-setup
+
+      - name: Static checks
+        working-directory: .
+        run: python3 tools/ci_check.py
+
+      - name: Prepare the release keystore
+        # Runs unconditionally so a repository without the signing secrets still
+        # gets both APKs built — the release one simply comes out unsigned. (The
+        # decode cannot be gated on `secrets.*` in an `if:`, because a secret that
+        # has not been created is empty there rather than absent.)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: .
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "No ANDROID_KEYSTORE_BASE64 secret set — the release APK will be unsigned."
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/meetbeatz-release.jks
+          {
+            echo "ANDROID_KEYSTORE_PATH=meetbeatz-release.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Release keystore ready."
+
+      - name: Build debug APK
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle.log
+
+      - name: Build release APK
+        if: success()
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee -a gradle.log
+
+      # The bundle is the file that actually reaches Play, so it is built here on every
+      # push. Without this step the first time anything compiles an .aab would be the
+      # publish run itself — the worst possible place to discover the packaging task is
+      # broken.
+      - name: Build release bundle (the Play artifact)
+        if: success()
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace bundleRelease 2>&1 | tee -a gradle.log
+
+      - name: Report build failures as annotations
+        # Kotlin and Java compiler errors, plus the Gradle failure summary, are
+        # republished as check-run annotations. They are then readable from the API
+        # (`gh api …/check-runs/<id>/annotations`) as well as in the web UI, which is
+        # how a build failure can be diagnosed without opening the raw log.
+        if: failure()
+        working-directory: .
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          log = pathlib.Path("android/gradle.log")
+          if not log.exists():
+              print("::error::The build failed before Gradle produced any output.")
+              raise SystemExit(0)
+
+          lines = log.read_text(errors="replace").splitlines()
+          interesting = [
+              line for line in lines
+              if re.search(r"^e: |^w: .*error|error:|What went wrong|Execution failed|> Task .*FAILED|Caused by|Could not resolve|Unresolved reference|FAILURE:", line)
+          ]
+          if not interesting:
+              interesting = lines[-30:]
+
+          # GitHub keeps at most 10 annotations per level per step, so the first
+          # errors are emitted as errors and the next batch as warnings.
+          for line in interesting[:10]:
+              print(f"::error::{line.strip()[:1000]}")
+          for line in interesting[10:20]:
+              print(f"::warning::{line.strip()[:1000]}")
+          PY
+
+      - name: Signing report
+        # Prints the SHA-256 of every signing certificate in this build. The value
+        # for the release keystore is the one that belongs in
+        # https://meetbeatz.com/.well-known/assetlinks.json.
+        run: ./gradlew --no-daemon signingReport > signing-report.txt || true
+
+      - name: Name the APKs
+        working-directory: .
+        run: |
+          mkdir -p dist
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
+          code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' android/app/build.gradle.kts)
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "dist/meetbeatz-${version}-${code}-debug.apk"
+          # A release build with no signing config is emitted as
+          # app-release-unsigned.apk, which matters because an unsigned APK cannot be
+          # installed at all. Both names are copied so the artifact always matches the
+          # build that ran.
+          for candidate in app-release.apk app-release-unsigned.apk; do
+            if [ -f "android/app/build/outputs/apk/release/$candidate" ]; then
+              cp "android/app/build/outputs/apk/release/$candidate" \
+                 "dist/meetbeatz-${version}-${code}-release.apk"
+              echo "Packaged release APK from $candidate"
+            fi
+          done
+          cp android/signing-report.txt dist/ || true
+          # An .aab is a ZIP whose first entry is BundleConfig.pb; a truncated download or
+          # a failed build would still copy as a zero-byte or unreadable file, and Play
+          # reports that as an opaque upload error. Check it here instead.
+          aab="android/app/build/outputs/bundle/release/app-release.aab"
+          if [ -f "$aab" ]; then
+            cp "$aab" "dist/meetbeatz-${version}-${code}.aab"
+            unzip -l "dist/meetbeatz-${version}-${code}.aab" | grep -q 'BundleConfig.pb' \
+              || { echo "::error::app-release.aab is not a readable bundle"; exit 1; }
+            echo "Packaged bundle: $(du -h "dist/meetbeatz-${version}-${code}.aab" | cut -f1)"
+          else
+            echo "::error::bundleRelease produced no app-release.aab"
+            exit 1
+          fi
+          ls -la dist
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: meetbeatz-debug-apk
+          path: dist/*debug.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: meetbeatz-release-apk
+          path: |
+            dist/*release.apk
+            dist/signing-report.txt
+          if-no-files-found: warn
+          retention-days: 90
+
+      # The same artifact the publish workflow uploads to Play, downloadable from every
+      # push, so a build can be sideloaded through the Play Console by hand if needed.
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v5
+        with:
+          name: meetbeatz-release-bundle
+          path: dist/*.aab
+          if-no-files-found: error
+          retention-days: 90
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/android-build-setup
+
+      - name: Android Lint
+        # Findings are reported in the log and uploaded, but a lint warning must not
+        # be the reason an APK cannot be produced: `lint { abortOnError = false }` in
+        # app/build.gradle.kts keeps this step green.
+        run: ./gradlew --no-daemon lintDebug
+
+      - name: Upload the lint report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: lint-report
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 30

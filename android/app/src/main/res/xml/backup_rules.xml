@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below auto-backup rules.
+
+  There is very little app-owned state to protect: the session, the cart and the cached
+  beats all live in the browser engine's storage (Chrome's or the WebView's), not here.
+  The one thing worth excluding is the fallback shell's cache — a licence file that a
+  customer paid for should not silently travel to a cloud backup.
+-->
+<full-backup-content>
+    <exclude domain="cache" path="." />
+</full-backup-content>

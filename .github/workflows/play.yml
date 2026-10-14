@@ -1,0 +1,221 @@
+name: Publish to Google Play
+
+# Uploads a signed Android App Bundle to the Google Play Console.
+#
+# It cannot create your Play Developer account, create the app entry there, or fill in
+# the store listing, content rating and data-safety forms — Google requires the account
+# owner to do those by hand. What it does do is every mechanical step after that: build
+# a correctly signed bundle, upload it to the track you choose, attach the R8 mapping so
+# crash reports stay readable, and hand back a link to install it on a phone.
+#
+# Start with the `internalsharing` track: it needs no review, no listing and no testers,
+# and it prints a URL that installs the app on any signed-in device immediately. That is
+# the fastest way to hold the real Play-signed build in your hand.
+#
+# Requires two sets of repository secrets — see docs/ANDROID_APP.md §5:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#   ANDROID_KEY_PASSWORD      the upload key this bundle is signed with
+#   PLAY_SERVICE_ACCOUNT_JSON  a Google Cloud service account with Play access
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play track to upload to"
+        type: choice
+        options: [internalsharing, internal, alpha, beta, production]
+        default: internalsharing
+      status:
+        description: "Release status (completed = submitted for review, draft = saved for later)"
+        type: choice
+        options: [completed, draft]
+        default: completed
+      dry_run:
+        description: "Build and sign the bundle, but do not upload"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: play-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: Build a signed bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      uploadable: ${{ steps.credentials.outputs.uploadable }}
+      version: ${{ steps.credentials.outputs.version }}
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/android-build-setup
+
+      - name: Check for signing and Play credentials
+        id: credentials
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        working-directory: .
+        run: |
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
+          code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' android/app/build.gradle.kts)
+          echo "version=${version} (${code})" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            # A v* tag now also produces an installable build (see release.yml), so a tag
+            # push must not fail here just because Play has not been set up yet — that
+            # would put a red X on a release for no reason. Pressing the *publish* button
+            # with no key is different: that is a deliberate act and gets an error.
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "::error::No ANDROID_KEYSTORE_BASE64 secret. Play rejects an unsigned bundle, so this job stops here. Create your upload key with tools/make_upload_key.sh and add the four ANDROID_KEYSTORE_* secrets — see docs/ANDROID_APP.md §5."
+              exit 1
+            fi
+            echo "::warning::Skipping the Play upload: no ANDROID_KEYSTORE_BASE64 secret yet. Nothing is wrong with the release — the installable APK is on the GitHub Release. Set up §5 when you want Play builds."
+            echo "uploadable=false" >> "$GITHUB_OUTPUT"
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_key=true" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::notice::No PLAY_SERVICE_ACCOUNT_JSON secret — the bundle will be built and attached as an artifact, but not uploaded. Upload it by hand from Play Console, or add the secret to automate it (docs/ANDROID_APP.md §5)."
+            echo "uploadable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "uploadable=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore the upload key
+        if: steps.credentials.outputs.has_key == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: .
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-key.jks
+          {
+            echo "ANDROID_KEYSTORE_PATH=upload-key.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the release bundle
+        if: steps.credentials.outputs.has_key == 'true'
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace bundleRelease 2>&1 | tee bundle.log
+
+      - name: Report build failures as annotations
+        if: failure()
+        working-directory: .
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("android/bundle.log")
+          if not log.exists():
+              print("::error::The build failed before Gradle produced any output.")
+              raise SystemExit(0)
+          lines = log.read_text(errors="replace").splitlines()
+          interesting = [l for l in lines if re.search(r"^e: |error:|What went wrong|Execution failed|FAILED|Caused by|Unresolved reference", l)]
+          for line in (interesting or lines[-30:])[:10]:
+              print(f"::error::{line.strip()[:1000]}")
+          PY
+
+      - name: Collect the bundle
+        if: steps.credentials.outputs.has_key == 'true'
+        working-directory: .
+        run: |
+          mkdir -p dist
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
+          code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' android/app/build.gradle.kts)
+          cp android/app/build/outputs/bundle/release/app-release.aab "dist/meetbeatz-${version}-${code}.aab"
+          # R8's mapping file, so Play can turn a stack trace from a crash report back
+          # into real class and method names.
+          if [ -f android/app/build/outputs/mapping/release/mapping.txt ]; then
+            cp android/app/build/outputs/mapping/release/mapping.txt dist/mapping.txt
+          fi
+          ls -la dist
+
+      - name: Verify the bundle is signed
+        if: steps.credentials.outputs.has_key == 'true'
+        working-directory: .
+        run: |
+          bundle=$(ls dist/*.aab)
+          if unzip -l "$bundle" | grep -q "META-INF/.*\.RSA\|META-INF/.*\.DSA\|META-INF/.*\.EC"; then
+            echo "$bundle is signed."
+          else
+            echo "::error::The bundle is not signed — Play would reject it. Check the ANDROID_KEYSTORE_* secrets."
+            exit 1
+          fi
+
+      - name: Upload the bundle as an artifact
+        if: steps.credentials.outputs.has_key == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: meetbeatz-aab
+          path: dist/
+          if-no-files-found: error
+          retention-days: 90
+
+  upload:
+    name: Upload to Google Play
+    needs: bundle
+    if: needs.bundle.outputs.uploadable == 'true' && inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download the bundle
+        uses: actions/download-artifact@v5
+        with:
+          name: meetbeatz-aab
+          path: dist
+
+      - name: Upload to the ${{ inputs.track || 'internalsharing' }} track
+        id: play
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.meetbeatz.app
+          releaseFiles: dist/*.aab
+          track: ${{ inputs.track || 'internalsharing' }}
+          status: ${{ inputs.status || 'completed' }}
+          releaseName: "Meetbeatz ${{ needs.bundle.outputs.version }}"
+          whatsNewDirectory: docs/play/release-notes
+          mappingFile: dist/mapping.txt
+
+      - name: Where to get it
+        env:
+          DOWNLOAD_URL: ${{ steps.play.outputs.internalSharingDownloadUrl }}
+        run: |
+          {
+            echo "### Meetbeatz ${{ needs.bundle.outputs.version }} uploaded"
+            echo
+            echo "Track: \`${{ inputs.track || 'internalsharing' }}\`  ·  status: \`${{ inputs.status || 'completed' }}\`"
+            echo
+            if [ -n "$DOWNLOAD_URL" ]; then
+              echo "**Install it on a phone:** [$DOWNLOAD_URL]($DOWNLOAD_URL)"
+              echo
+              echo "Open that link on the device (signed in to a Google account with access)."
+            else
+              echo "Check Play Console → your app → Testing → the track, then use *View release* to install it."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

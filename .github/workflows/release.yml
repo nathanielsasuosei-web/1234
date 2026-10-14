@@ -1,0 +1,191 @@
+name: Release an installable build
+
+# Turns a tag into something you can tap on a phone.
+#
+# Actions artifacts are a zip: download, unzip, move to the device — three steps and a
+# desktop. A GitHub Release asset is a URL. Open it on the Android phone, tap install,
+# done. This repository is public, so that URL needs no account and no login.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The attached build is the *debug* APK, which is debug-signed and therefore installable
+# by hand. A release APK without your upload key is unsigned, and Android refuses an
+# unsigned APK outright, so it would be a trap to put one here. The Play bundle is
+# separate: play.yml reacts to the same tag and skips itself until the key exists.
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # to create the release and attach the APK
+
+jobs:
+  release:
+    name: Attach an installable APK to the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # For tools/make_install_qr.py — the QR card attached to each release. Two small
+      # pure-Python wheels, and worth it: a code is the difference between installing the
+      # build and retyping a 90-character URL onto a phone keyboard.
+      - name: Install the QR tooling
+        working-directory: .
+        run: python3 -m pip install --quiet segno pillow
+
+      - uses: ./.github/actions/android-build-setup
+
+      - name: Static checks
+        working-directory: .
+        run: python3 tools/ci_check.py
+
+      - name: Build the debug APK
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle.log
+
+      - name: Report build failures as annotations
+        if: failure()
+        working-directory: .
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("android/gradle.log")
+          if not log.exists():
+              print("::error::The build failed before Gradle produced any output.")
+              raise SystemExit(0)
+          lines = log.read_text(errors="replace").splitlines()
+          interesting = [l for l in lines if re.search(r"^e: |error:|What went wrong|Execution failed|FAILED|Caused by|Unresolved reference", l)]
+          for line in (interesting or lines[-30:])[:10]:
+              print(f"::error::{line.strip()[:1000]}")
+          PY
+
+      - name: Name the APK and fingerprint it
+        id: apk
+        working-directory: .
+        run: |
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
+          code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' android/app/build.gradle.kts)
+          mkdir -p dist
+          apk="dist/meetbeatz-${version}-${code}-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          echo "file=$(basename "$apk")" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "$apk" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$apk" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          ls -la dist
+
+      - name: Write the release notes
+        working-directory: .
+        env:
+          TAG: ${{ github.ref_name }}
+          FILE: ${{ steps.apk.outputs.file }}
+          SIZE: ${{ steps.apk.outputs.size }}
+          SHA: ${{ steps.apk.outputs.sha256 }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          short_commit=$(echo "$COMMIT" | cut -c1-7)
+          cat > release-notes-body.md <<EOF
+          # Install Meetbeatz on an Android phone
+
+          Tap **$FILE** below, on the phone itself, and open it — or scan
+          **meetbeatz-$TAG-install-qr.png**, which encodes the same download link:
+
+          1. Chrome or Files warns that this file type may be harmful. That warning is what
+             Android shows for *any* app installed from outside the Play Store.
+          2. Tap **Download anyway**, then open the download.
+          3. Android asks for permission to install unknown apps — **Settings → allow from
+             this source**, then back and **Install**.
+          4. Open **Meetbeatz**. The splash screen appears, then the beat store.
+
+          If you would rather verify the file before installing, its SHA-256 is:
+
+          \`\`\`
+          $SHA
+          \`\`\`
+
+          $FILE · $SIZE
+
+          ## What this build is
+
+          The real app — the same Trusted Web Activity code destined for Play, signed with
+          the debug key so it can be installed by hand. Play's copy is signed with your
+          upload key instead; nothing else differs.
+
+          One visible difference while the website is unpatched: **the address bar stays on
+          screen.** Android hides it only when a \`.well-known/assetlinks.json\` on the domain
+          lists the exact certificate this build was signed with, and the website half of
+          this work is still an unapplied patch under \`web/\`. Everything else works — the
+          store, studio booking and the recording booth all run inside the app.
+
+          ## Before you install the Play build later
+
+          This APK carries the same package name as the Play build but a different signing
+          key. Android refuses to replace an app with one signed by another key, so when
+          Play's copy arrives, uninstall this one first — otherwise the install fails with
+          a bare "App not installed" that explains nothing.
+
+          Tag $TAG · commit $short_commit.
+          EOF
+          echo "--- release notes ---"
+          cat release-notes-body.md
+
+      - name: Draw the install QR card
+        working-directory: .
+        env:
+          TAG: ${{ github.ref_name }}
+          FILE: ${{ steps.apk.outputs.file }}
+          SIZE: ${{ steps.apk.outputs.size }}
+        run: |
+          python3 tools/make_install_qr.py \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$FILE" \
+            --version "$TAG" \
+            --size-note "$SIZE" \
+            --out "dist/meetbeatz-$TAG-install-qr.png"
+
+      - name: Publish the release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          FILE: ${{ steps.apk.outputs.file }}
+        run: |
+          qr="dist/meetbeatz-$TAG-install-qr.png"
+          # Re-tagging or fixing a version should replace the assets, not fail the run.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "dist/$FILE" "$qr" --clobber
+            gh release edit "$TAG" --notes-file release-notes-body.md
+            echo "Updated the existing release $TAG."
+          else
+            gh release create "$TAG" "dist/$FILE" "$qr" \
+              --title "Meetbeatz test build ($TAG)" \
+              --notes-file release-notes-body.md
+          fi
+
+      - name: Where to get it
+        working-directory: .
+        env:
+          FILE: ${{ steps.apk.outputs.file }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/latest/download/$FILE"
+          {
+            echo "### Installable build ready"
+            echo
+            echo "**Open this on the Android phone:** [$url]($url)"
+            echo
+            echo "1. Tap the download, accept the *unknown source* warning, install, and open."
+            echo "2. Spot-check the store, a studio booking, and the recording booth."
+            echo
+            echo "No login needed — the repository is public."
+          } >> "$GITHUB_STEP_SUMMARY"

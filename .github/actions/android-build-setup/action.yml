@@ -1,0 +1,53 @@
+name: Android build setup
+description: >-
+  Everything the Android jobs need before Gradle runs: JDK 17, an Android SDK with the
+  platform this app compiles against, and Gradle dependency caching. Shared by the
+  build, lint and Play publishing workflows so the three cannot drift apart — a
+  mismatch between them is how a release build ends up compiling against a different
+  SDK than the one that was tested.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: "17"
+
+    - name: Android SDK
+      shell: bash
+      # The runner image already carries an Android SDK with the licences accepted, so
+      # this only locates it, installs the compile platform if it is missing, and never
+      # fails the job: Gradle downloads anything still absent by itself.
+      run: |
+        sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        if [ -z "$sdk" ] && [ -d /usr/local/lib/android/sdk ]; then
+          sdk=/usr/local/lib/android/sdk
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+        fi
+        echo "Android SDK: ${sdk:-not found}"
+
+        sdkmanager_cmd="$(command -v sdkmanager || true)"
+        if [ -z "$sdkmanager_cmd" ] && [ -n "$sdk" ] && [ -x "$sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+          sdkmanager_cmd="$sdk/cmdline-tools/latest/bin/sdkmanager"
+        fi
+
+        if [ -n "$sdkmanager_cmd" ]; then
+          (yes | "$sdkmanager_cmd" --licenses > /dev/null 2>&1) || true
+          "$sdkmanager_cmd" "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /dev/null 2>&1 \
+            || echo "sdkmanager could not install those packages — Gradle will fetch what it needs."
+        fi
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Reuse the debug signing key
+      # Without this, every run generates a fresh debug keystore and therefore a
+      # different certificate fingerprint, so a CI-built APK could never match an entry
+      # in assetlinks.json. Cached, the fingerprint is stable.
+      uses: actions/cache@v5
+      with:
+        path: ~/.android/debug.keystore
+        key: meetbeatz-debug-keystore-v1

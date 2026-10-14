@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The primary action on the offline screen: an acid pill, matching the site's buttons.
+
+  A rounded rectangle is drawn as a filled shape with its corners knocked out, because
+  this is a plain drawable rather than a MaterialButton — the shell uses framework
+  widgets so it can never be the reason a release fails to resolve a style.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/acid" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,20 @@
+# Single source of truth for every version used by the Android app.
+#
+# These are the versions the Android Browser Helper project itself builds and tests
+# against (android-browser-helper 2.7.4 ships with AGP 8.9.1 / Gradle 8.11.1 /
+# compileSdk 36 / androidx.browser 1.10.0), which is why the app pins the same set.
+[versions]
+agp = "8.9.1"
+kotlin = "2.0.21"
+androidx-core = "1.17.0"
+androidx-browser = "1.10.0"
+android-browser-helper = "2.7.4"
+
+[libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "androidx-browser" }
+android-browser-helper = { module = "com.google.androidbrowserhelper:androidbrowserhelper", version.ref = "android-browser-helper" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
