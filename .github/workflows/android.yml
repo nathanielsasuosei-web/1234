@@ -82,7 +82,18 @@ jobs:
           ls -1 "$sdk" 2>/dev/null || true
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Reuse the debug signing key
+        # Without this, every run generates a fresh debug keystore and therefore a
+        # different certificate fingerprint, so a CI-built APK could never match an
+        # entry in assetlinks.json. Cached, the fingerprint is stable and the debug
+        # APK can be used to test verified deep links. It is printed in the signing
+        # report artifact.
+        uses: actions/cache@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: meetbeatz-debug-keystore-v1
 
       - name: Static checks
         working-directory: .
@@ -171,15 +182,22 @@ jobs:
           code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' android/app/build.gradle.kts)
           cp android/app/build/outputs/apk/debug/app-debug.apk \
              "dist/meetbeatz-${version}-${code}-debug.apk"
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk \
-               "dist/meetbeatz-${version}-${code}-release.apk" || true
-          fi
+          # A release build with no signing config is emitted as
+          # app-release-unsigned.apk, which matters because an unsigned APK cannot be
+          # installed at all. Both names are copied so the artifact always matches the
+          # build that ran.
+          for candidate in app-release.apk app-release-unsigned.apk; do
+            if [ -f "android/app/build/outputs/apk/release/$candidate" ]; then
+              cp "android/app/build/outputs/apk/release/$candidate" \
+                 "dist/meetbeatz-${version}-${code}-release.apk"
+              echo "Packaged release APK from $candidate"
+            fi
+          done
           cp android/signing-report.txt dist/ || true
           ls -la dist
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meetbeatz-debug-apk
           path: dist/*debug.apk
@@ -187,7 +205,7 @@ jobs:
           retention-days: 90
 
       - name: Upload release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meetbeatz-release-apk
           path: |
@@ -239,7 +257,7 @@ jobs:
           fi
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Android Lint
         # Findings are reported in the log and uploaded, but a lint warning must not
@@ -249,7 +267,7 @@ jobs:
 
       - name: Upload the lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lint-report
           path: android/app/build/reports/lint-results-debug.html
