@@ -30,15 +30,17 @@ docs/                 this file, and the Play Store material
 
 Every push to this repository builds the app and attaches it as a download:
 
-1. Open the **Actions** tab → **Android** → the most recent run.
-2. Under **Artifacts**, download **meetbeatz-debug-apk**.
+1. Open the **Actions** tab → **Android** → the most recent green run.
+2. Under **Artifacts**, download **meetbeatz-debug-apk** (about 4.7 MB).
 3. Unzip it, copy `meetbeatz-1.0.0-1-debug.apk` to the phone (or send it by WhatsApp /
    email / Drive), tap it, and allow installation from that source when Android asks.
 4. Open **Meetbeatz**. You should see the splash screen, then the store — no address bar.
 
-The first build takes about five minutes; later builds are faster. `SigningReport` is
-attached as an artifact too, which prints the SHA-256 of the certificate that build was
-signed with.
+The first build takes about five minutes; later builds are faster. The release artifact
+carries `signing-report.txt` — the SHA-256 of every signing certificate in the build, which
+is the value that belongs in `assetlinks.json` (see §3). The debug keystore is cached
+between runs, so the debug APK's fingerprint stays the same and can be used for testing
+verified deep links.
 
 ### On your own machine — Android Studio
 
@@ -176,6 +178,22 @@ The parts that only you can do:
 Then: Internal testing → Closed testing → Production. Internal testing is the fastest way
 to get a real Play-installed build into your own hands, and it takes about an hour.
 
+### Renaming the package (only before the first release)
+
+This build uses **`com.meetbeatz.app`**. Changing it before the first Play release is a
+five-minute find/replace; afterwards it is impossible, because Play ties an app's
+identity, its signing key and every existing install to the package name.
+
+```bash
+grep -rl "com\.meetbeatz\.app" android/ web/ docs/ | xargs sed -i 's/com\.meetbeatz\.app/<new.id>/g'
+```
+
+The four places that actually matter are `applicationId`/`namespace` in
+`android/app/build.gradle.kts`, the Kotlin `package` declaration (whose folder should be
+renamed to match), `android:targetPackage` in `android/app/src/main/res/xml/shortcuts.xml`,
+and `package_name` in `web/public/.well-known/assetlinks.json`. `python3 tools/ci_check.py`
+then tells you whether they still agree — it cross-checks all four on every run.
+
 ---
 
 ## 6. When something looks wrong
@@ -256,21 +274,26 @@ In rough order of value for a beat store:
 
 ## What has and has not been verified
 
-Being explicit, because this repository was written without an Android SDK:
+Being explicit, because most of this was written without an Android SDK in reach:
 
-- **Verified here:** every resource reference resolves (`tools/ci_check.py`), the
-  manifest's origin and package agree with `assetlinks.json` and Gradle, every icon
-  density exists, both Kotlin files are structurally sound, and the website patch applies
-  cleanly to the site's current `main`.
+- **It compiles.** The Actions run builds `assembleDebug` and `assembleRelease` — Kotlin
+  compilation, manifest merge, resource linking and R8 minification included — and
+  publishes both APKs. `lintDebug` runs cleanly as its own job.
+- **Verified here:** every resource reference resolves (`tools/ci_check.py`), no style
+  implies a parent that does not exist, the manifest's origin and package agree with
+  `assetlinks.json` and Gradle, every icon density exists, both Kotlin files are
+  structurally sound, and the website patch applies cleanly to the site's current `main`.
 - **Verified against the library source:** every android-browser-helper API the app
   overrides — `LauncherActivity.getCustomTabsCallback()`, `getFallbackStrategy()`,
   `TwaLauncher.FallbackStrategy`, `NotificationPermissionRequestActivity`,
-  `ShortcutTrampolineActivity`, the `DelegationService` declaration and all six splash
-  metadata keys — was read from `android-browser-helper` **2.7.4**, the version pinned in
+  `ShortcutTrampolineActivity`, the `DelegationService` declaration and every splash
+  metadata key — was read from `android-browser-helper` **2.7.4**, the version pinned in
   `android/gradle/libs.versions.toml`.
-- **Not verified:** that the app **compiles**. No JDK or Android SDK was available in the
-  environment it was written in, so the first Actions run is the real compile. If it
-  fails, the log names the file and line; the most likely candidates are the two
-  overridden method signatures in `MeetbeatzLauncherActivity.kt`.
+- **Found by CI rather than by reading:** the first build failed the resource link because
+  a style named `Meetbeatz.Fallback.Title` implied a parent style that did not exist. The
+  names are flat now, and `tools/ci_check.py` grew the check that catches it — verified by
+  reintroducing the original name and watching the checker fail.
 - **Not verified on a device:** the splash screen, deep-link verification, downloads,
-  and microphone capture. All of those are listed in §6 with what to check.
+  microphone capture and notification delegation all need a real phone. §6 lists what to
+  check for each, and the debug APK from Actions is signed with a stable key so those
+  checks can be repeated across builds.

@@ -76,9 +76,9 @@ manifest or the shell itself does.
 
 ## Honest status
 
-Written without an Android SDK in reach, so: every resource reference, manifest
-invariant, icon density, brand asset and the website patch are **checked automatically**
-(`tools/ci_check.py`, run first in CI), but **the app has not been compiled or run on a
-device**. The first Actions run is the real compile — see the last section of
-[`docs/ANDROID_APP.md`](docs/ANDROID_APP.md#what-has-and-has-not-been-verified) for what
-is verified, how it was verified, and what to check on a phone.
+**It builds.** Every push runs `assembleDebug` and `assembleRelease` — Kotlin, resource
+linking and R8 minification included — and attaches installable APKs to the run. The app
+has **not been run on a phone**, so the things that need a real device (splash screen,
+verified deep links, downloads, microphone capture, delegated notifications) are listed
+with what to check in §6 of [`docs/ANDROID_APP.md`](docs/ANDROID_APP.md#6-when-something-looks-wrong).
+That file's last section says exactly what is verified, how, and what is not.
