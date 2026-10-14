@@ -51,17 +51,35 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Ensure the SDK platform and build tools
-        # Tolerant on purpose: the runners already carry an Android SDK, and Gradle
-        # downloads anything missing on its own. This step only makes that faster and
-        # is not allowed to be the reason a build stops.
+      - name: Android SDK
+        # The runner image already carries an Android SDK with the licences accepted, so
+        # this step only locates it, installs the platform the app compiles against if it
+        # is missing, and never fails the job: Gradle downloads anything still absent.
+        # (This replaced android-actions/setup-android, which failed before the build even
+        # started and whose reason is not visible in the job log.)
         run: |
-          (yes | sdkmanager --licenses > /dev/null 2>&1) || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /dev/null 2>&1 \
-            || echo "sdkmanager could not install them — Gradle will download what it needs."
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$sdk" ] && [ -d /usr/local/lib/android/sdk ]; then
+            sdk=/usr/local/lib/android/sdk
+            echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+            echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+          fi
+          echo "Android SDK: ${sdk:-not found}"
+
+          sdkmanager_cmd="$(command -v sdkmanager || true)"
+          if [ -z "$sdkmanager_cmd" ] && [ -n "$sdk" ] && [ -x "$sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+            sdkmanager_cmd="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          if [ -n "$sdkmanager_cmd" ]; then
+            (yes | "$sdkmanager_cmd" --licenses > /dev/null 2>&1) || true
+            "$sdkmanager_cmd" "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /dev/null 2>&1 \
+              || echo "sdkmanager could not install those packages — Gradle will fetch what it needs."
+          else
+            echo "No sdkmanager available — Gradle will fetch what it needs."
+          fi
+
+          ls -1 "$sdk" 2>/dev/null || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -159,14 +177,28 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Ensure the SDK platform and build tools
+      - name: Android SDK
+        # Same approach as the build job: use the SDK the runner already has, install
+        # the compile platform if it is missing, never fail on account of it.
         run: |
-          (yes | sdkmanager --licenses > /dev/null 2>&1) || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /dev/null 2>&1 \
-            || echo "sdkmanager could not install them — Gradle will download what it needs."
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$sdk" ] && [ -d /usr/local/lib/android/sdk ]; then
+            sdk=/usr/local/lib/android/sdk
+            echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+            echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+          fi
+          echo "Android SDK: ${sdk:-not found}"
+
+          sdkmanager_cmd="$(command -v sdkmanager || true)"
+          if [ -z "$sdkmanager_cmd" ] && [ -n "$sdk" ] && [ -x "$sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+            sdkmanager_cmd="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          if [ -n "$sdkmanager_cmd" ]; then
+            (yes | "$sdkmanager_cmd" --licenses > /dev/null 2>&1) || true
+            "$sdkmanager_cmd" "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /dev/null 2>&1 \
+              || echo "sdkmanager could not install those packages — Gradle will fetch what it needs."
+          fi
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
