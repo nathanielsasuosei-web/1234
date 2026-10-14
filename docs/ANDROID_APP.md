@@ -33,7 +33,10 @@ git tag v1.0.0 && git push origin v1.0.0
 ```
 
 The **Release an installable build** workflow builds the debug APK, attaches it to a
-GitHub Release and prints the download URL. Because the repository is public, that URL
+GitHub Release along with a `meetbeatz-<tag>-install-qr.png` card, and prints the download
+URL. Scan the card with the phone camera and the install starts — no typing a URL on a
+touch keyboard. The card is drawn by `tools/make_install_qr.py` from the release's own
+download link, so it can never point at the wrong build. Because the repository is public, that URL
 needs no login, and it is an `.apk` rather than a zip — so the whole install happens on
 the phone: open the link, tap the download, accept the unknown-source warning, install.
 

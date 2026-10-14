@@ -11,7 +11,7 @@ notifications and a branded offline screen.
 
 | | |
 | --- | --- |
-| **Install it on a phone** | `git tag v1.0.0 && git push origin v1.0.0` → tap the APK link on the [latest release](releases/latest) (no login, no unzipping) |
+| **Install it on a phone** | `git tag v1.0.0 && git push origin v1.0.0` → on the [latest release](releases/latest), scan the QR card or tap the APK (no login, no unzipping) |
 | **Get an APK by hand** | Actions → Android → the latest run → Artifacts → `meetbeatz-debug-apk` |
 | **See it in a browser** | `tools/preview_web_patch.sh`, or open the site on a phone and choose **Install app** |
 | **Read this first** | [`docs/ANDROID_APP.md`](docs/ANDROID_APP.md) — build, sign, verify, publish, troubleshoot |

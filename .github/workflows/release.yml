@@ -38,6 +38,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # For tools/make_install_qr.py — the QR card attached to each release. Two small
+      # pure-Python wheels, and worth it: a code is the difference between installing the
+      # build and retyping a 90-character URL onto a phone keyboard.
+      - name: Install the QR tooling
+        working-directory: .
+        run: python3 -m pip install --quiet segno pillow
+
       - uses: ./.github/actions/android-build-setup
 
       - name: Static checks
@@ -92,7 +99,8 @@ jobs:
           cat > release-notes-body.md <<EOF
           # Install Meetbeatz on an Android phone
 
-          Tap **$FILE** below, on the phone itself, and open it:
+          Tap **$FILE** below, on the phone itself, and open it — or scan
+          **meetbeatz-$TAG-install-qr.png**, which encodes the same download link:
 
           1. Chrome or Files warns that this file type may be harmful. That warning is what
              Android shows for *any* app installed from outside the Play Store.
@@ -133,21 +141,34 @@ jobs:
           echo "--- release notes ---"
           cat release-notes-body.md
 
+      - name: Draw the install QR card
+        working-directory: .
+        env:
+          TAG: ${{ github.ref_name }}
+          FILE: ${{ steps.apk.outputs.file }}
+          SIZE: ${{ steps.apk.outputs.size }}
+        run: |
+          python3 tools/make_install_qr.py \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$FILE" \
+            --version "$TAG" \
+            --size-note "$SIZE" \
+            --out "dist/meetbeatz-$TAG-install-qr.png"
+
       - name: Publish the release
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           FILE: ${{ steps.apk.outputs.file }}
-          VERSION: ${{ steps.apk.outputs.file }}
         run: |
-          # Re-tagging or fixing a version should replace the APK, not fail the run.
+          qr="dist/meetbeatz-$TAG-install-qr.png"
+          # Re-tagging or fixing a version should replace the assets, not fail the run.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "dist/$FILE" --clobber
+            gh release upload "$TAG" "dist/$FILE" "$qr" --clobber
             gh release edit "$TAG" --notes-file release-notes-body.md
             echo "Updated the existing release $TAG."
           else
-            gh release create "$TAG" "dist/$FILE" \
+            gh release create "$TAG" "dist/$FILE" "$qr" \
               --title "Meetbeatz test build ($TAG)" \
               --notes-file release-notes-body.md
           fi
