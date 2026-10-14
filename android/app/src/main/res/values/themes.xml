@@ -22,19 +22,28 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="Meetbeatz.Fallback.Title">
+    <!--
+      Text styles for the offline/error screen.
+
+      Deliberately NOT named "Meetbeatz.Fallback.Something": a style name containing dots
+      implies a parent style named by the part before the last dot, so
+      "Meetbeatz.Fallback.Title" would look for a "Meetbeatz.Fallback" style and fail the
+      resource link. Either declare a parent (or an empty one) or, as here, keep the name
+      flat.
+    -->
+    <style name="MeetbeatzTitle">
         <item name="android:textColor">@color/cream</item>
         <item name="android:textSize">20sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
-    <style name="Meetbeatz.Fallback.Body">
+    <style name="MeetbeatzBody">
         <item name="android:textColor">@color/muted</item>
         <item name="android:textSize">15sp</item>
         <item name="android:lineSpacingMultiplier">1.25</item>
     </style>
 
-    <style name="Meetbeatz.Fallback.Button">
+    <style name="MeetbeatzButton">
         <item name="android:textColor">@color/ink</item>
         <item name="android:background">@color/acid</item>
         <item name="android:textSize">15sp</item>

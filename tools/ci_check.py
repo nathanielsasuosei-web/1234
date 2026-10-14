@@ -44,6 +44,7 @@ DENSITIES = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]
 
 failures: list[str] = []
 notes: list[str] = []
+STYLE_NAMES: set[str] = set()
 
 
 def fail(message: str) -> None:
@@ -133,6 +134,10 @@ def defined_resources() -> dict[str, set[str]]:
         "xml": set(),
         "layout": set(),
     }
+    # Style names exactly as written in XML, for the implicit-parent check. The set
+    # above maps dots to underscores, which is what resource ids look like.
+    global STYLE_NAMES
+    STYLE_NAMES = set()
 
     for values_file in sorted((RES / "values").glob("*.xml")) + sorted(
         (RES / "values-night").glob("*.xml") if (RES / "values-night").exists() else []
@@ -142,6 +147,7 @@ def defined_resources() -> dict[str, set[str]]:
             for name in re.findall(rf"<{kind}\s+name=\"([^\"]+)\"", text):
                 defined[kind].add(name)
         for name in re.findall(r"<style\s+name=\"([^\"]+)\"", text):
+            STYLE_NAMES.add(name)
             # Resource ids use underscores where the XML style name uses dots.
             defined["style"].add(name.replace(".", "_"))
 
@@ -157,6 +163,36 @@ def defined_resources() -> dict[str, set[str]]:
                 defined[kind].add(item.stem)
 
     return defined
+
+
+def check_style_parents() -> None:
+    """Styles whose name implies a parent that does not exist.
+
+    A style named `A.B.C` inherits from `A.B` implicitly unless it declares a parent, and
+    AAPT fails the whole resource link with "resource style/A.B not found" when `A.B` is
+    not defined. This exact mistake cost a CI run, which is why it is now a check: it is
+    invisible to every reader of the file, because the names look perfectly reasonable.
+    """
+    for values_file in sorted((RES / "values").glob("*.xml")) + sorted(
+        (RES / "values-night").glob("*.xml") if (RES / "values-night").exists() else []
+    ):
+        text = values_file.read_text(encoding="utf-8")
+        for match in re.finditer(r"<style\s+([^>]*)>", text):
+            attributes = match.group(1)
+            name = re.search(r'name="([^"]+)"', attributes)
+            if not name:
+                continue
+            name = name.group(1)
+            if 'parent="' in attributes or "." not in name:
+                continue
+            implicit_parent = name.rsplit(".", 1)[0]
+            if implicit_parent not in STYLE_NAMES:
+                fail(
+                    f"{values_file.name}: style \"{name}\" has no parent attribute and its "
+                    f"implied parent \"{implicit_parent}\" does not exist — AAPT will fail "
+                    f"with \"resource style/{implicit_parent} not found\". Add parent=\"\" "
+                    f"or a real parent, or flatten the name."
+                )
 
 
 def check_resource_references(manifest: str, defined: dict[str, set[str]]) -> None:
@@ -372,6 +408,7 @@ def check_kotlin_balance() -> None:
 def main() -> int:
     defined = defined_resources()
     manifest = check_manifest()
+    check_style_parents()
     check_resource_references(manifest, defined)
     check_assets()
     check_shortcuts()

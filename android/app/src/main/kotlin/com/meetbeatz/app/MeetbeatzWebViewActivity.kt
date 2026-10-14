@@ -513,14 +513,14 @@ class MeetbeatzWebViewActivity : Activity() {
         column.addView(
             TextView(this).apply {
                 text = getString(R.string.offline_title)
-                setTextAppearance(R.style.Meetbeatz_Fallback_Title)
+                setTextAppearance(R.style.MeetbeatzTitle)
                 gravity = Gravity.CENTER
             },
         )
         column.addView(
             TextView(this).apply {
                 text = getString(R.string.offline_body)
-                setTextAppearance(R.style.Meetbeatz_Fallback_Body)
+                setTextAppearance(R.style.MeetbeatzBody)
                 gravity = Gravity.CENTER
                 setPadding(0, 16, 0, 0)
             },
@@ -528,14 +528,14 @@ class MeetbeatzWebViewActivity : Activity() {
         column.addView(
             Button(this).apply {
                 text = getString(R.string.offline_retry)
-                setTextAppearance(R.style.Meetbeatz_Fallback_Button)
+                setTextAppearance(R.style.MeetbeatzButton)
                 setOnClickListener { retry() }
             },
         )
         column.addView(
             Button(this).apply {
                 text = getString(R.string.open_in_browser)
-                setTextAppearance(R.style.Meetbeatz_Fallback_Body)
+                setTextAppearance(R.style.MeetbeatzBody)
                 setTextColor(ContextCompat.getColor(this@MeetbeatzWebViewActivity, R.color.cream))
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 setPadding(0, 24, 0, 0)
