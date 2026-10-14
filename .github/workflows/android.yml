@@ -16,6 +16,9 @@ name: Android
 on:
   push:
     branches: ["main", "arena/**"]
+    # Documentation-only changes deliberately do not start a build — nothing in
+    # docs/ or README.md can affect the APK. Use the Run workflow button
+    # (workflow_dispatch, below) to build one on demand.
     paths:
       - "android/**"
       - "tools/**"
